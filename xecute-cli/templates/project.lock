@@ -1411,9 +1411,9 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "xecute"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "215eb2303e2d9e4e9c6999475e09185698a7a66c34942402f0a432637337b283"
+checksum = "542aed39e117d7174dadaa0cb9533a81eddf2b861214559d94689360d804c23e"
 dependencies = [
  "axum",
  "schemars",
@@ -1425,9 +1425,9 @@ dependencies = [
 
 [[package]]
 name = "xmacros"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bac3d3fafb44940b15cad72109e83de7b8497a5f2a07ebcdad16ea39a6fc577"
+checksum = "44e6261d9962395f4e103a1ee82c70c02492187b132e74ff5b83cf7eb2e277c4"
 dependencies = [
  "proc-macro2",
  "quote",
