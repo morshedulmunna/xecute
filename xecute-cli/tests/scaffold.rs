@@ -50,15 +50,23 @@ fn new_project_is_formatted_locked_and_accepts_resources() {
         "src/modules/example/controller.rs",
         "src/modules/example/tests/http.rs",
         ".env.example",
-        "AppConfig.toml",
-        "src/modules/uploads/module.rs",
-        "src/modules/api_v2/controller.rs",
+        "config/AppConfig.toml",
         "src/tests/versions.rs",
-        "src/tests/uploads.rs",
     ] {
         assert!(project.join(file).is_file(), "missing {file}");
     }
+    for removed in [
+        "src/modules/uploads",
+        "src/modules/api_v2",
+        "src/configs/uploads.rs",
+        "src/tests/uploads.rs",
+    ] {
+        assert!(!project.join(removed).exists(), "unexpected {removed}");
+    }
+    assert!(!project.join("AppConfig.toml").exists());
     let manifest = fs::read_to_string(project.join("Cargo.toml")).unwrap();
+    assert!(!manifest.contains("upload-s3"));
+    assert!(!manifest.contains("features = [\"upload\"]"));
     assert!(!project.join("compose.yaml").exists());
     assert!(!project.join("docker-compose.yml").exists());
     let dockerfile = fs::read_to_string(project.join("Dockerfile")).unwrap();
@@ -67,7 +75,7 @@ fn new_project_is_formatted_locked_and_accepts_resources() {
     assert!(dockerfile.contains("aarch64-unknown-linux-musl"));
     assert!(dockerfile.contains("USER 65532:65532"));
     assert!(!dockerfile.contains("curl"));
-    assert!(manifest.contains("version = \"0.1.7\""));
+    assert!(manifest.contains("version = \"0.1.8\""));
     assert!(!manifest.contains("path ="));
     assert!(
         Command::new(binary)

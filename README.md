@@ -40,7 +40,7 @@ use an injectable repository and validated request DTOs.
 
 ## Release status
 
-Published packages are `xecute-cli 0.1.12`, `xecute 0.1.7`, and `xmacros 0.1.6`.
+Published packages are `xecute-cli 0.1.13`, `xecute 0.1.8`, and `xmacros 0.1.6`.
 MVC is the default; CQRS is selected with `--cqrs`.
 
 This release includes `xecute run dev` with automatic development rebuild/restart,
@@ -60,9 +60,9 @@ Use a Rust installation with Cargo, rustfmt, and Clippy.
 Install the published CLI:
 
 ```sh
-cargo install xecute-cli --version 0.1.12 --locked
+cargo install xecute-cli --version 0.1.13 --locked
 # Update an existing installation:
-cargo install xecute-cli --version 0.1.12 --locked --force
+cargo install xecute-cli --version 0.1.13 --locked --force
 ```
 
 Create and run an MVC application:
@@ -236,7 +236,7 @@ xecute run dev -- --port 4000
 ```
 
 The application must implement any arguments passed after `--`; the generated
-server configures its port with `server.bind_address` in `AppConfig.toml` instead.
+server configures its port with `server.bind_address` in `config/AppConfig.toml` instead.
 
 The watcher polls file metadata every 200 ms and groups edits with a 300 ms quiet
 period. It detects additions, changes, removals, and rename-save operations for
@@ -277,7 +277,8 @@ A generated MVC project contains:
 ```text
 my-app/
 ├── .xecute/architecture
-├── AppConfig.toml
+├── config/
+│   └── AppConfig.toml
 ├── .env.example
 ├── Cargo.toml
 ├── Cargo.lock
@@ -715,7 +716,7 @@ These are HTTP middleware, not automatic CQRS handler pipelines.
 
 Every generated project includes embedded Swagger UI at `/docs/` and an OpenAPI
 3.1 document at `/docs/openapi.json`. Resource generation adds each controller's
-operations automatically. Set `docs.enabled = false` in `AppConfig.toml` to disable both routes.
+operations automatically. Set `docs.enabled = false` in `config/AppConfig.toml` to disable both routes.
 
 | Annotation | Purpose |
 | --- | --- |
@@ -762,7 +763,7 @@ checks for databases and other dependencies.
 
 ## Application configuration
 
-Ordinary settings live in the generated root `AppConfig.toml`. Commit this file;
+Ordinary settings live in the generated `config/AppConfig.toml`. Commit this file;
 keep credentials in `.env` or inject them through your deployment's secret store.
 `.env` is optional and ignored by Git/Docker. Process variables take precedence
 over `.env` for secrets. Ordinary settings have no environment fallback or override.
@@ -805,7 +806,7 @@ bounds fail startup before logging/listening. Missing individual values use type
 defaults, but the file itself must exist. Request limits must be positive; the
 CORS cache duration may be zero.
 
-`Config::from_file()` reads `AppConfig.toml` relative to the working directory.
+`Config::from_file()` reads `config/AppConfig.toml` relative to the working directory.
 `Config::from_path(path)` supports an explicit file chosen in bootstrap code.
 The file is parsed once into a validated snapshot shared with logger startup;
 there is no automatic production reload. Development hot reload watches TOML
@@ -813,7 +814,7 @@ files and restarts the process when settings change.
 
 The Dockerfile includes this file and adapts only the generated loopback bind to
 `0.0.0.0:3000`. Custom bind addresses remain unchanged. To supply deployment
-settings, mount a replacement `/app/AppConfig.toml` read-only. The default private
+settings, mount a replacement `/app/config/AppConfig.toml` read-only. The default private
 `/app/logs` directory is owned by UID 65532; custom log mounts must also be writable
 by this user. A read-only root filesystem requires writable log storage or an
 empty `logging.file_dir`.
@@ -974,7 +975,7 @@ CLI 0.1.9; existing root-level features are preserved rather than moved.
 ## Welcome route and startup URLs
 
 `GET /` returns HTTP 200 with the application name, `status: "ok"`, a welcome
-message, and `documentation: "/docs/"`. With `docs.enabled = false` in `AppConfig.toml`, the
+message, and `documentation: "/docs/"`. With `docs.enabled = false` in `config/AppConfig.toml`, the
 `documentation` field is null. Other unregistered paths still return the normal
 404 envelope. The root route is defined in `src/server/router.rs` and can be
 customized there.
@@ -1044,7 +1045,7 @@ public directory directly or mount updated assets; there is no binary embedding.
 
 ## File logging and external logging backends
 
-Logging outputs use these settings in `AppConfig.toml`:
+Logging outputs use these settings in `config/AppConfig.toml`:
 
 ```toml
 [logging]
@@ -1109,18 +1110,18 @@ and dependency updates; updating the CLI does not rewrite an existing app.
 `src/configs/environment.rs` re-exports the shared runtime readers.
 `configs::load_env()` loads optional credentials once; `Env::process()` and
 `configs::read_env(key)` read secrets with process-over-dotenv precedence.
-Ordinary settings use `ConfigFile::load("AppConfig.toml")` and typed dotted paths.
+Ordinary settings use `ConfigFile::load("config/AppConfig.toml")` and typed dotted paths.
 Generated server and logger use the same validated configuration snapshot.
 
 ```rust
 let token = xecute::config::Env::process().secret("API_TOKEN")?;
-let file = xecute::config::ConfigFile::load("AppConfig.toml")?;
+let file = xecute::config::ConfigFile::load("config/AppConfig.toml")?;
 let timeout = file.range("server.request_timeout_seconds", 30, 1, 3600)?;
 ```
 
 ## Typed configuration
 
-These APIs are available with CLI 0.1.12, runtime 0.1.7, and macros 0.1.6.
+These APIs are available with CLI 0.1.13, runtime 0.1.8, and macros 0.1.6.
 Update the CLI before generating a new project. Existing applications require
 corresponding dependency and source changes; updating the CLI does not rewrite them.
 
@@ -1271,7 +1272,7 @@ Enable the runtime's optional test helpers only for development:
 
 ```toml
 [dev-dependencies]
-xecute = { version = "0.1.7", features = ["testing"] }
+xecute = { version = "0.1.8", features = ["testing"] }
 ```
 
 Generated manifests already include this entry. `TestingModule` compiles isolated
@@ -1319,154 +1320,68 @@ mock isolation, concurrent initialization, nested request scopes, and cleanup.
 
 ## Multipart file uploads
 
-Generated projects include `src/modules/uploads/` with a controller and async
-startup module. Enable private writes explicitly in `AppConfig.toml`:
-
-```toml
-[uploads]
-enabled = true
-storage = "local"
-directory = "storage/uploads"
-max_files = 4
-max_file_bytes = 524288
-max_total_bytes = 524288
-allowed_types = ["image/png", "image/jpeg", "application/pdf"]
-```
-
-The endpoint accepts repeated `file` parts:
+A runnable controller example is included at
+[`xecute/examples/file_upload.rs`](https://github.com/morshedulmunna/xecute/blob/main/xecute/examples/file_upload.rs).
+Run from the repository root:
 
 ```sh
+cargo run -p xecute --example file_upload --features upload
 curl -F 'file=@report.pdf;type=application/pdf' http://127.0.0.1:3000/uploads
 curl -F 'file=@photo.png;type=image/png' -F 'file=@report.pdf;type=application/pdf' \
-  http://127.0.0.1:3000/v1/uploads
+  http://127.0.0.1:3000/uploads
 ```
 
-A successful request returns 201 with an array of metadata containing `key`,
-`original_name`, `content_type`, `size`, and `sha256`. Generated UUID keys never
-use client filenames. Local objects and staging files stay outside `public/`;
-there is no public download route. Persist returned metadata in your own database
-and implement authorized retrieval/deletion according to your application rules.
-Attach authentication/permissions using the existing controller/route middleware
-before enabling upload writes in a deployed application.
+The controller returns HTTP 201 with an array of `key`, `original_name`,
+`content_type`, `size`, and `sha256`. It accepts PNG/JPEG/PDF content, at most four
+files, 1 MiB per file, and 2 MiB total; HTTP framing has an additional 64 KiB
+allowance. MIME signatures must match declared types. Files are private under
+`target/file-upload-example/objects/`, with temporary files in `staging/`.
+`/openapi.json` describes the multipart endpoint; the example has no download route.
+Invalid multipart requests return 400, oversized uploads 413, invalid types 415,
+and missing/empty/excess files 422, with a consistent error envelope and request ID.
 
-The runtime streams each part to a temporary file and keeps only an 8 KiB sniff
-sample plus hashing state in memory. It checks actual per-file and aggregate
-bytes, file count, nonempty content, safe display filenames, and an exact MIME
-allowlist. Declared MIME must match an `infer`-recognized file signature; unknown
-formats and mismatches are rejected. Signature recognition is not a full decoder,
-malware scan, or content moderation system. Add those checks before publishing
-files when your application needs them. Text form fields are not part of this
-example contract; only repeated `file` fields are accepted.
+This standalone example binds loopback and is separate from generated projects.
+Before deploying it, add authentication and application rate/time limits, use a
+persistent private storage directory, and define cleanup/retention. Content
+signature validation is not malware scanning. Batch rollback is best effort;
+crashes or cancellation can leave objects requiring reconciliation.
 
-| Failure | Status |
-| --- | --- |
-| Malformed multipart, unexpected field, unsafe filename | 400 |
-| File content, aggregate bytes, or HTTP body limit exceeded | 413 |
-| Unrecognized, mismatched, or disallowed MIME type | 415 |
-| Missing/empty file or too many files | 422 |
-| Storage provider failure | 500 with safe public details |
 
-`server.body_limit_bytes` also bounds multipart framing and headers. When uploads
-are enabled, startup requires it to cover `uploads.max_total_bytes + 65536` bytes.
-To accept larger files, increase both limits explicitly. HTTP deadlines and global
-rate/concurrency policies still apply. The low-level `UploadService` expects its
-caller to apply an HTTP body limit as well; payload limits alone do not bound
-multipart headers or framing.
-
-All files validate before any storage commit. Invalid batches remove staging
-files without writing final objects. Local storage publishes complete files
-atomically without replacing an existing key. Handled storage failures trigger
-best-effort deletion of previously committed batch objects. A process crash,
-cancelled request, or uncertain S3 response can leave staging/committed objects;
-use application reconciliation, disk quotas, and retention/cleanup appropriate to
-your deployment. Stored objects do not expire automatically. Keep upload storage
-and staging directories private and unavailable for untrusted filesystem writes.
-
-### S3 storage
-
-S3 is an optional Cargo feature; local uploads do not compile the AWS SDK.
-Ordinary backend settings stay in `AppConfig.toml`:
+New projects do not include a built-in uploads module or upload configuration.
+To implement uploads in your own feature module, enable the runtime `upload`
+feature (and `upload-s3` for S3). The runtime provides `UploadPolicy`,
+`UploadService`, `LocalStorage`, `UploadStorage`, and optional `S3Storage`.
+Use `#[multipart]` on the upload handler for multipart OpenAPI metadata.
 
 ```toml
-[uploads]
-enabled = true
-storage = "s3"
-directory = "storage/uploads" # private streaming staging directory
-max_files = 4
-max_file_bytes = 524288
-max_total_bytes = 524288
-allowed_types = ["image/png", "image/jpeg", "application/pdf"]
-
-[uploads.s3]
-bucket = "my-private-bucket"
-region = "us-east-1"
-endpoint = "" # AWS default; set an HTTPS URL for an S3-compatible service
-prefix = "uploads"
-force_path_style = false
-allow_http = false
+[dependencies]
+xecute = { version = "0.1.8", features = ["upload"] }
 ```
 
-Use workload credentials or the standard AWS credential provider chain. For local
-static credentials, put only `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and an
-optional `AWS_SESSION_TOKEN` in `.env`; never put them in TOML. Compile/run with:
-
-```sh
-xecute run dev --features s3
-cargo run --features s3
-# Container image with the optional SDK:
-docker build --build-arg CARGO_FEATURES=s3 -t my-app .
-```
-
-For local MinIO, configure `endpoint`, `force_path_style = true`, and explicitly
-set `allow_http = true` only if the development endpoint uses HTTP. Embedded
-credentials, query strings, and endpoint paths are rejected. The adapter uses the
-official AWS SDK, streams retryable file bodies, supplies MIME/checksum metadata,
-and uses conditional `If-None-Match: *` writes. It never creates buckets, changes
-ACLs, or makes objects public. Provision a bucket and scoped PutObject/DeleteObject
-permissions, plus KMS permissions if required by its encryption policy. Bucket
-versioning, lifecycle, encryption, and application metadata retention remain
-operator/application choices.
-
-Runtime users enable `xecute/upload` for `UploadPolicy`, `UploadService`,
-`LocalStorage`, and the `UploadStorage` adapter trait; `upload-s3` adds `S3Storage`.
-`S3Storage::new` accepts an application-configured AWS client; `from_environment`
-uses the standard credential chain. `#[multipart]` inside a `#[routes]` method
-produces the matching multipart OpenAPI schema and cannot be combined with JSON
-body metadata. The example Swagger page can submit repeated file fields.
-
-Tests cover invalid batches, count/size limits, request framing limits, generated
-keys, private storage, temporary-file cleanup, and handled-failure rollback. A
-local mock S3 endpoint verifies signed conditional PUT, streamed content, metadata,
-and DELETE; no live cloud bucket or real credentials are used by the tests.
+Apply HTTP body limits and authentication to your own upload route, keep storage
+outside `public/`, and configure its policy and backend explicitly.
 
 ## API version groups and separate OpenAPI documents
 
-Generated applications explicitly register version groups in
+Generated applications register only v1 in
 `src/server/versions.rs`:
 
 | URL | Contract |
 | --- | --- |
 | `/example` | Existing unversioned resource alias |
 | `/v1/example` | Version-one resources, using the same v1 service/container |
-| `/v1/uploads` | Version-one upload endpoint when uploads are enabled |
-| `/v2/status` | Independent v2 example from `src/modules/api_v2/` |
 | `/docs/v1/` | Version-one Swagger UI |
 | `/docs/v1/openapi.json` | Version-one contract, with `/v1/...` paths |
-| `/docs/v2/` | Version-two Swagger UI |
-| `/docs/v2/openapi.json` | Version-two contract, with `/v2/...` paths |
 
 `/docs/` and `/docs/openapi.json` continue to describe the unversioned aliases.
-Each version has its own routes, operation IDs, and schema components; v2 does
-not automatically inherit v1 resources. Add v2-specific modules/controllers to
-its router as the contract evolves. Use a separate DI container when a version
-needs independently constructed provider instances.
+No v2 module, routes, or documentation are generated. Additional version groups
+can be registered explicitly using the runtime API when needed.
 
 ```rust
 use xecute::{ApiVersion, ApiVersions};
 
 let versions = ApiVersions::new()
-    .with(ApiVersion::new("v1", v1_router, V1Controller::api_operations())?)?
-    .with(ApiVersion::new("v2", v2_router, V2Controller::api_operations())?)?;
+    .with(ApiVersion::new("v1", v1_router, V1Controller::api_operations())?)?;
 let router = versions.mount(axum::Router::new());
 let documents = versions.documents("My API")?;
 ```

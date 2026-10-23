@@ -2563,7 +2563,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "xecute"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "aws-config",
  "aws-sdk-s3",
@@ -2584,7 +2584,7 @@ dependencies = [
 
 [[package]]
 name = "xecute-cli"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "ctrlc",
  "nix",

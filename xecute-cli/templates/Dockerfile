@@ -2,7 +2,7 @@
 # Build tools stay in this stage; the final image receives only the stripped binary.
 FROM rust:1.98.1-alpine AS build
 ARG TARGETARCH
-# Optional: docker build --build-arg CARGO_FEATURES=s3 ...
+# Optional: select application Cargo features with --build-arg CARGO_FEATURES=...
 ARG CARGO_FEATURES=""
 RUN apk add --no-cache gcc musl-dev \
     && if [ -n "$CARGO_FEATURES" ]; then apk add --no-cache cmake make perl g++; fi
@@ -10,10 +10,10 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY public ./public
-COPY AppConfig.toml ./
+COPY config ./config
 # Adapt the generated loopback default for container networking; preserve custom binds.
-RUN sed -i 's/^bind_address = "127\.0\.0\.1:3000"$/bind_address = "0.0.0.0:3000"/' AppConfig.toml \
-    && mkdir -p /app/logs /app/storage/uploads
+RUN sed -i 's/^bind_address = "127\.0\.0\.1:3000"$/bind_address = "0.0.0.0:3000"/' config/AppConfig.toml \
+    && mkdir -p /app/logs
 # BuildKit selects the matching static musl target for the requested image architecture.
 RUN case "$TARGETARCH" in \
       amd64) target=x86_64-unknown-linux-musl ;; \
@@ -32,9 +32,8 @@ FROM gcr.io/distroless/static-debian13:nonroot AS runtime
 WORKDIR /app
 COPY --from=build --chown=65532:65532 /app/server /app/server
 COPY --from=build --chown=65532:65532 /app/public /app/public
-COPY --from=build --chown=65532:65532 /app/AppConfig.toml /app/AppConfig.toml
+COPY --from=build --chown=65532:65532 /app/config/AppConfig.toml /app/config/AppConfig.toml
 COPY --from=build --chown=65532:65532 /app/logs /app/logs
-COPY --from=build --chown=65532:65532 /app/storage /app/storage
 USER 65532:65532
 EXPOSE 3000
 STOPSIGNAL SIGTERM

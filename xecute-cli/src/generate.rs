@@ -177,52 +177,21 @@ pub fn new_project(
             .ok_or("runtime path must be UTF-8")?
             .replace('\\', "\\\\")
             .replace('"', "\\\"");
-        format!("xecute = {{ path = \"{runtime}\", features = [\"upload\"] }}")
+        format!("xecute = {{ path = \"{runtime}\" }}")
     } else {
-        "xecute = { version = \"0.1.7\", features = [\"upload\"] }".to_owned()
+        "xecute = { version = \"0.1.8\" }".to_owned()
     };
     let test_dependency = crate::manifest::testing_dependency(&dependency)?;
     let templates = [
-        (
-            "src/tests/uploads.rs",
-            include_str!("../templates/tests/uploads.rs"),
-        ),
         (
             "src/tests/versions.rs",
             include_str!("../templates/tests/versions.rs"),
         ),
         (
-            "src/configs/uploads.rs",
-            include_str!("../templates/configs/uploads.rs"),
-        ),
-        (
             "src/server/versions.rs",
             include_str!("../templates/server/versions.rs"),
         ),
-        (
-            "src/modules/uploads/mod.rs",
-            include_str!("../templates/uploads/mod.rs"),
-        ),
-        (
-            "src/modules/uploads/module.rs",
-            include_str!("../templates/uploads/module.rs"),
-        ),
-        (
-            "src/modules/uploads/controller.rs",
-            include_str!("../templates/uploads/controller.rs"),
-        ),
-        (
-            "src/modules/api_v2/mod.rs",
-            include_str!("../templates/api_v2/mod.rs"),
-        ),
-        (
-            "src/modules/api_v2/controller.rs",
-            include_str!("../templates/api_v2/controller.rs"),
-        ),
-        (
-            "src/modules/mod.rs",
-            "//! Application feature modules.\n\npub mod uploads;\npub mod api_v2;\n",
-        ),
+        ("src/modules/mod.rs", "//! Application feature modules.\n"),
         (
             "src/tests/application.rs",
             include_str!("../templates/tests/application.rs"),
@@ -355,8 +324,8 @@ pub fn new_project(
         ),
         (".env.example", include_str!("../templates/env.example")),
         (
-            "AppConfig.toml",
-            include_str!("../templates/AppConfig.toml"),
+            "config/AppConfig.toml",
+            include_str!("../templates/config/AppConfig.toml"),
         ),
         (
             "rust-toolchain.toml",

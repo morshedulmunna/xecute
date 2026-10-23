@@ -1,4 +1,4 @@
-//! AppConfig.toml-driven output, rotation, and filtering settings.
+//! config/AppConfig.toml-driven output, rotation, and filtering settings.
 
 use super::{ConfigError, ConfigFile};
 use std::path::{Path, PathBuf};

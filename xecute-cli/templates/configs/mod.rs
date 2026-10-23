@@ -2,7 +2,6 @@
 
 mod cors;
 mod docs;
-mod uploads;
 mod environment;
 pub(crate) mod logging;
 mod static_files;
@@ -10,7 +9,6 @@ mod server;
 
 pub use cors::CorsConfig;
 pub use docs::DocsConfig;
-pub use uploads::UploadConfig;
 pub use environment::{ConfigError, ConfigFile, Env, load_env, read_env};
 pub use static_files::StaticConfig;
 pub use logging::LoggingConfig;

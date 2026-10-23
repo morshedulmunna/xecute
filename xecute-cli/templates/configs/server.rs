@@ -1,6 +1,6 @@
 //! Validated server settings; invalid limits fail startup rather than disable protection.
 
-use super::{ConfigError, ConfigFile, CorsConfig, DocsConfig, LoggingConfig, StaticConfig, UploadConfig};
+use super::{ConfigError, ConfigFile, CorsConfig, DocsConfig, LoggingConfig, StaticConfig};
 use std::{net::SocketAddr, time::Duration};
 
 /// Typed, validated HTTP server configuration. Durations use monotonic clocks.
@@ -30,10 +30,8 @@ pub struct Config {
     pub static_files: StaticConfig,
     /// Validated local logging destinations and event filter.
     pub logging: LoggingConfig,
-    /// Enable explicitly registered /v1 and /v2 URL groups.
+    /// Enable explicitly registered /v1 URL routes.
     pub versioning_enabled: bool,
-    /// Private upload backend and streaming validation limits.
-    pub uploads: UploadConfig,
 }
 
 impl Default for Config {
@@ -52,15 +50,14 @@ impl Default for Config {
             static_files: StaticConfig::default(),
             logging: LoggingConfig::default(),
             versioning_enabled: true,
-            uploads: UploadConfig::default(),
         }
     }
 }
 
 impl Config {
-    /// Read ordinary settings from the required AppConfig.toml in the working directory.
+    /// Read ordinary settings from the required config/AppConfig.toml in the working directory.
     pub fn from_file() -> Result<Self, ConfigError> {
-        Self::from_path("AppConfig.toml")
+        Self::from_path("config/AppConfig.toml")
     }
 
     /// Load an explicitly selected configuration file, without environment overrides.
@@ -77,10 +74,6 @@ impl Config {
             "cors.origins", "cors.allowed_methods", "cors.allowed_headers", "cors.exposed_headers",
             "cors.allow_credentials", "cors.max_age_seconds", "docs.enabled",
             "logging.filter", "logging.stdout_enabled", "logging.file_dir", "api.versioning_enabled",
-            "uploads.enabled", "uploads.storage", "uploads.directory", "uploads.max_files",
-            "uploads.max_file_bytes", "uploads.max_total_bytes", "uploads.allowed_types",
-            "uploads.s3.bucket", "uploads.s3.region", "uploads.s3.endpoint", "uploads.s3.prefix",
-            "uploads.s3.force_path_style", "uploads.s3.allow_http",
         ])?;
         let defaults = Self::default();
         let number = |key, default, max| file.range(key, default, 1, max);
@@ -104,9 +97,7 @@ impl Config {
             static_files: StaticConfig::default(),
             logging: LoggingConfig::from_config(file)?,
             versioning_enabled: file.get_or("api.versioning_enabled", true)?,
-            uploads: UploadConfig::from_config(file)?,
         };
-        config.uploads.validate_location(&config)?;
         Ok(config)
     }
 }

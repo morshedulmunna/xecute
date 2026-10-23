@@ -16,14 +16,14 @@ fn app(config: &Config) -> Router {
 async fn versions_have_independent_routes_schemas_and_local_swagger_assets() {
     let app = app(&Config::default());
     for (path, status) in [
-        ("/v1/example", StatusCode::OK), ("/v2/status", StatusCode::OK),
+        ("/v1/example", StatusCode::OK), ("/v2/status", StatusCode::NOT_FOUND),
         ("/v2/example", StatusCode::NOT_FOUND), ("/v1/status", StatusCode::NOT_FOUND),
-        ("/docs/v1/", StatusCode::OK), ("/docs/v2/", StatusCode::OK),
-        ("/docs/v1/swagger-ui-bundle.js", StatusCode::OK), ("/docs/v2/swagger-ui-bundle.js", StatusCode::OK),
+        ("/docs/v1/", StatusCode::OK),
+        ("/docs/v1/swagger-ui-bundle.js", StatusCode::OK),
     ] {
         assert_eq!(app.clone().oneshot(request(path, "127.0.0.1")).await.unwrap().status(), status, "{path}");
     }
-    for (version, expected, absent) in [("v1", "/v1/example", "/v2/status"), ("v2", "/v2/status", "/v1/example")] {
+    for (version, expected, absent) in [("v1", "/v1/example", "/v2/status")] {
         let response = app.clone().oneshot(request(&format!("/docs/{version}/openapi.json"), "127.0.0.1")).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         let document: serde_json::Value = serde_json::from_slice(&to_bytes(response.into_body(), 1048576).await.unwrap()).unwrap();

@@ -1,4 +1,4 @@
-//! Browser cross-origin policy parsed from typed arrays in AppConfig.toml.
+//! Browser cross-origin policy parsed from typed arrays in config/AppConfig.toml.
 
 use super::{ConfigError, ConfigFile};
 use axum::http::{HeaderName, HeaderValue, Method, Uri};

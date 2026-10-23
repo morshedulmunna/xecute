@@ -10,7 +10,6 @@ publish = false
 
 [features]
 default = []
-s3 = ["xecute/upload-s3"]
 
 [dependencies]
 validator = { version = "0.20", features = ["derive"] }

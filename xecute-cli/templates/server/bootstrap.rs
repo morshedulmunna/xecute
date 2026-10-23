@@ -8,7 +8,7 @@ use tokio::sync::Notify;
 /// Start the configured listener and stop accepting work on a termination signal.
 /// Active requests drain until the configured grace period expires.
 pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Load environment values for secrets; ordinary settings come from AppConfig.toml.
+    // Load environment values for secrets; ordinary settings come from config/AppConfig.toml.
     crate::configs::load_env()?;
     let config = Config::from_file()?;
     super::static_files::validate(&config.static_files)?;
@@ -16,10 +16,8 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Resolve application dependencies and apply the shared HTTP policies.
     let container = Arc::new(app_module::AppModule::container()?);
-    let app = app_module::AppModule::router_with_container(container.clone())?
-        .merge(crate::modules::uploads::UploadModule::router_with_container(&config, container).await?);
-    let mut operations = app_module::AppModule::api_operations();
-    operations.extend(crate::modules::uploads::UploadModule::api_operations(&config));
+    let app = app_module::AppModule::router_with_container(container)?;
+    let operations = app_module::AppModule::api_operations();
     let versions = super::versions::groups(&config, app.clone(), operations.clone())?;
     let app = versions.mount(app)
         .merge(super::docs::router(&config, operations)?)

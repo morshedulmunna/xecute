@@ -11,5 +11,4 @@ mod static_files;
 
 mod application;
 
-mod uploads;
 mod versions;

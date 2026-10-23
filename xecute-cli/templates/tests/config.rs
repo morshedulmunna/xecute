@@ -22,11 +22,6 @@ fn rejects_invalid_configuration() {
         "[server]\nbind_adress = '127.0.0.1:3000'",
         "[unknown_section]",
         "[logging]\nstdout_enabled = 1",
-        "[uploads]\nmax_files = 0",
-        "[uploads]\nstorage = 'unknown'",
-        "[uploads]\nallowed_types = ['application/*']",
-        "[uploads]\nenabled = true\ndirectory = 'public/uploads'",
-        "[uploads]\nenabled = true\nmax_file_bytes = 1048576\nmax_total_bytes = 1048576",
         "[api]\nversioning_enabled = 'true'",
     ] {
         assert!(Config::from_config(&ConfigFile::parse(source).unwrap()).is_err(), "{source}");
@@ -37,7 +32,7 @@ fn rejects_invalid_configuration() {
 
 #[test]
 fn generated_file_contains_normal_settings_and_env_example_contains_only_secrets() {
-    let config = Config::from_config(&ConfigFile::parse(include_str!("../../AppConfig.toml")).unwrap()).unwrap();
+    let config = Config::from_config(&ConfigFile::parse(include_str!("../../config/AppConfig.toml")).unwrap()).unwrap();
     assert_eq!(config.bind_address.to_string(), "127.0.0.1:3000");
     assert!(config.logging.file_enabled);
     assert!(config.docs.enabled);

@@ -7,6 +7,24 @@ created projects and resources.
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-10-23
+
+Packages: `xecute-cli 0.1.13`, `xecute 0.1.8`, and unchanged `xmacros 0.1.6`.
+
+### Added
+
+- Runnable file-upload controller example with private local storage, multipart
+  OpenAPI metadata, size/type validation, and HTTP persistence/error tests.
+
+### Changed
+
+- Move generated application settings to config/AppConfig.toml, updating startup,
+  Docker, and documentation paths.
+
+- New projects generate only v1; remove the built-in v2 example and uploads module,
+  upload configuration, and default upload/S3 features. Runtime upload and versioning
+  APIs remain available for custom modules.
+
 ## [0.1.12] - 2026-10-23
 
 Packages: `xecute-cli 0.1.12`, `xecute 0.1.7`, and `xmacros 0.1.6`.
@@ -148,7 +166,7 @@ Packages: `xecute-cli 0.1.12`, `xecute 0.1.7`, and `xmacros 0.1.6`.
 - Added a root workspace manifest and build documentation.
 - Generated applications use runtime `xecute 0.1.4` and macros `xmacros 0.1.4`.
 
-[Unreleased]: https://github.com/morshedulmunna/xecute/compare/v0.1.12...HEAD
+[Unreleased]: https://github.com/morshedulmunna/xecute/compare/v0.1.13...HEAD
 [0.1.11]: https://github.com/morshedulmunna/xecute/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/morshedulmunna/xecute/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/morshedulmunna/xecute/compare/v0.1.8...v0.1.9
@@ -157,3 +175,5 @@ Packages: `xecute-cli 0.1.12`, `xecute 0.1.7`, and `xmacros 0.1.6`.
 [0.1.6]: https://github.com/morshedulmunna/xecute/releases/tag/v0.1.6
 
 [0.1.12]: https://github.com/morshedulmunna/xecute/compare/v0.1.11...v0.1.12
+
+[0.1.13]: https://github.com/morshedulmunna/xecute/compare/v0.1.12...v0.1.13
