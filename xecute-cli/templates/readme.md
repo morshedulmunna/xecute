@@ -286,3 +286,21 @@ src/
 MVC resources use `service.rs` inside their feature folder instead of CQRS
 commands/queries/services directories. This layout is available starting with
 CLI 0.1.9; existing root-level features are preserved rather than moved.
+
+## Welcome route and startup URLs
+
+`GET /` returns HTTP 200 with the application name, `status: "ok"`, a welcome
+message, and `documentation: "/docs/"`. With `SWAGGER_ENABLED=false`, the
+`documentation` field is null. Other unregistered paths still return the normal
+404 envelope. The root route is defined in `src/server/router.rs` and can be
+customized there.
+
+Startup logs include the server URL, Swagger UI URL (`/docs/`), and OpenAPI URL
+(`/docs/openapi.json`). The actual bound port is used, including when binding port
+zero. Wildcard bindings are displayed as local loopback URLs; IPv6 addresses are
+bracketed. These are local HTTP URLs; configure the public URL separately when
+running behind a TLS ingress or reverse proxy. Disabled documentation is logged
+without advertising Swagger links.
+
+Available starting with CLI 0.1.10. Existing projects need the corresponding
+server changes; updating the CLI does not rewrite them. The runtime crate is unchanged.

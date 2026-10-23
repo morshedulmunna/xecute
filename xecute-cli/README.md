@@ -173,3 +173,11 @@ src/
 MVC resources use `service.rs` inside their feature folder instead of CQRS
 commands/queries/services directories. This layout is available starting with
 CLI 0.1.9; existing root-level features are preserved rather than moved.
+
+## Root welcome and startup documentation links
+
+CLI 0.1.10 generates a welcome JSON response at `GET /` with HTTP 200, the app
+name, status, and a `/docs/` documentation path when Swagger is enabled. Startup
+logs show the actual server, Swagger UI, and OpenAPI URLs. Disabled Swagger is
+reported without links. Other unknown routes retain the normal 404 envelope.
+Existing applications require the server changes; CLI updates do not rewrite them.

@@ -22,7 +22,15 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Bind before announcing readiness; report the actual address assigned by the OS.
     let listener = tokio::net::TcpListener::bind(config.bind_address).await?;
-    tracing::info!(address = %listener.local_addr()?, "server listening");
+    let address = listener.local_addr()?;
+    let url = local_url(address);
+    tracing::info!(address = %address, url = %url, "server listening");
+    if config.docs.enabled {
+        tracing::info!(url = %format!("{url}/docs/"), "Swagger UI available");
+        tracing::info!(url = %format!("{url}/docs/openapi.json"), "OpenAPI document available");
+    } else {
+        tracing::info!("Swagger documentation disabled (SWAGGER_ENABLED=false)");
+    }
 
     // Notify the serving task when shutdown begins so it can enforce a drain deadline.
     let draining = Arc::new(Notify::new());
@@ -62,4 +70,32 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing::info!("server stopped");
 
     Ok(())
+}
+
+// Wildcard listener addresses are not browser destinations. Keep the bound port,
+// including an OS-assigned port when BIND_ADDRESS uses port zero.
+fn local_url(mut address: std::net::SocketAddr) -> String {
+    if address.ip().is_unspecified() {
+        address.set_ip(if address.is_ipv4() {
+            std::net::Ipv4Addr::LOCALHOST.into()
+        } else {
+            std::net::Ipv6Addr::LOCALHOST.into()
+        });
+    }
+    format!("http://{address}")
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn startup_urls_use_accessible_hosts_and_preserve_ports() {
+        for (address, expected) in [
+            ("0.0.0.0:3000", "http://127.0.0.1:3000"),
+            ("127.0.0.1:4100", "http://127.0.0.1:4100"),
+            ("[::]:3000", "http://[::1]:3000"),
+            ("[::1]:4100", "http://[::1]:4100"),
+        ] {
+            assert_eq!(super::local_url(address.parse().unwrap()), expected);
+        }
+    }
 }

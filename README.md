@@ -31,7 +31,7 @@ use an injectable repository and validated request DTOs.
 
 ## Release status
 
-Published packages are `xecute-cli 0.1.9`, `xecute 0.1.6`, and `xmacros 0.1.5`.
+Published packages are `xecute-cli 0.1.10`, `xecute 0.1.6`, and `xmacros 0.1.5`.
 MVC is the default; CQRS is selected with `--cqrs`.
 
 This release includes `xecute run dev` with automatic development rebuild/restart,
@@ -51,9 +51,9 @@ Use a Rust installation with Cargo, rustfmt, and Clippy.
 Install the published CLI:
 
 ```sh
-cargo install xecute-cli --version 0.1.9 --locked
+cargo install xecute-cli --version 0.1.10 --locked
 # Update an existing installation:
-cargo install xecute-cli --version 0.1.9 --locked --force
+cargo install xecute-cli --version 0.1.10 --locked --force
 ```
 
 Create and run an MVC application:
@@ -70,6 +70,7 @@ The application starts at `http://127.0.0.1:3000` with these endpoints:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
+| GET | `/` | Welcome JSON with the documentation path when Swagger is enabled |
 | GET | `/example` | List example records |
 | POST | `/example` | Create an example record |
 | GET | `/health/live` | Liveness probe |
@@ -940,3 +941,21 @@ src/
 MVC resources use `service.rs` inside their feature folder instead of CQRS
 commands/queries/services directories. This layout is available starting with
 CLI 0.1.9; existing root-level features are preserved rather than moved.
+
+## Welcome route and startup URLs
+
+`GET /` returns HTTP 200 with the application name, `status: "ok"`, a welcome
+message, and `documentation: "/docs/"`. With `SWAGGER_ENABLED=false`, the
+`documentation` field is null. Other unregistered paths still return the normal
+404 envelope. The root route is defined in `src/server/router.rs` and can be
+customized there.
+
+Startup logs include the server URL, Swagger UI URL (`/docs/`), and OpenAPI URL
+(`/docs/openapi.json`). The actual bound port is used, including when binding port
+zero. Wildcard bindings are displayed as local loopback URLs; IPv6 addresses are
+bracketed. These are local HTTP URLs; configure the public URL separately when
+running behind a TLS ingress or reverse proxy. Disabled documentation is logged
+without advertising Swagger links.
+
+Available starting with CLI 0.1.10. Existing projects need the corresponding
+server changes; updating the CLI does not rewrite them. The runtime crate is unchanged.

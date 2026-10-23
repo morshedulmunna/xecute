@@ -278,3 +278,22 @@ async fn json_rejections_and_method_errors_use_the_error_envelope() {
     assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
     assert!(response.headers().contains_key(header::ALLOW));
 }
+
+#[tokio::test]
+async fn root_welcomes_clients_and_only_advertises_enabled_docs() {
+    for enabled in [true, false] {
+        let mut config = Config::default();
+        config.docs.enabled = enabled;
+        let app = app(&config);
+        let response = app.clone().oneshot(request("/", "127.0.0.1")).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(response.headers().contains_key("x-request-id"));
+        let body = to_bytes(response.into_body(), 4096).await.unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["status"], "ok");
+        assert!(body.get("error").is_none());
+        if enabled { assert_eq!(body["documentation"], "/docs/"); }
+        else { assert!(body["documentation"].is_null()); }
+        assert_eq!(app.oneshot(request("/still-missing", "127.0.0.1")).await.unwrap().status(), StatusCode::NOT_FOUND);
+    }
+}
