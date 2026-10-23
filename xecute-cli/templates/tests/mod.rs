@@ -6,3 +6,5 @@ mod logging;
 mod rate_limit;
 mod server;
 mod support;
+
+mod static_files;

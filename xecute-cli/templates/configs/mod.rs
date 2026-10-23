@@ -2,20 +2,14 @@
 
 mod cors;
 mod docs;
-mod logging;
+mod environment;
+pub(crate) mod logging;
+mod static_files;
 mod server;
 
 pub use cors::CorsConfig;
 pub use docs::DocsConfig;
+pub use environment::{load_env, read_env};
+pub use static_files::StaticConfig;
 pub use logging::LoggingConfig;
 pub use server::Config;
-
-/// Load optional .env settings without overriding existing process variables.
-/// A missing file is valid; malformed files stop startup.
-pub fn load_env() -> Result<(), dotenvy::Error> {
-    match dotenvy::dotenv() {
-        Ok(_) => Ok(()),
-        Err(error) if error.not_found() => Ok(()),
-        Err(error) => Err(error),
-    }
-}

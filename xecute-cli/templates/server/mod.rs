@@ -9,6 +9,7 @@ mod middleware;
 pub(crate) mod rate_limit;
 mod router;
 mod shutdown;
+pub(crate) mod static_files;
 
 pub use bootstrap::run;
 pub use router::router;

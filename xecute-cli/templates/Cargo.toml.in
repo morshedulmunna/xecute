@@ -16,12 +16,14 @@ schemars = "1.2"
 utoipa-swagger-ui = { version = "9", features = ["axum", "vendored"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal", "time", "sync"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal", "time", "sync", "fs"] }
 dotenvy = "0.15"
 tracing = "0.1"
+tracing-appender = "0.2"
+percent-encoding = "2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 uuid = { version = "1", features = ["v4"] }
-tower-http = { version = "0.6", features = ["catch-panic", "cors", "limit"] }
+tower-http = { version = "0.6", features = ["catch-panic", "cors", "limit", "fs"] }
 
 [dev-dependencies]
 utoipa = "5"

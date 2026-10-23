@@ -10,8 +10,9 @@ use tokio::sync::Notify;
 pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Load environment values before initializing logging or reading server settings.
     crate::configs::load_env()?;
-    logging::init()?;
     let config = Config::from_env()?;
+    super::static_files::validate(&config.static_files)?;
+    let _logging = logging::init(&config)?;
 
     // Resolve application dependencies and apply the shared HTTP policies.
     let app = app_module::AppModule::router()?.merge(super::docs::router(
@@ -30,6 +31,10 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tracing::info!(url = %format!("{url}/docs/openapi.json"), "OpenAPI document available");
     } else {
         tracing::info!("Swagger documentation disabled (SWAGGER_ENABLED=false)");
+    }
+
+    if config.static_files.enabled {
+        tracing::info!(url = %format!("{url}{}", config.static_files.mount), "static files available");
     }
 
     // Notify the serving task when shutdown begins so it can enforce a drain deadline.

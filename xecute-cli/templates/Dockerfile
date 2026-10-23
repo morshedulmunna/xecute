@@ -6,6 +6,7 @@ RUN apk add --no-cache gcc musl-dev
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
+COPY public ./public
 # BuildKit selects the matching static musl target for the requested image architecture.
 RUN case "$TARGETARCH" in \
       amd64) target=x86_64-unknown-linux-musl ;; \
@@ -21,6 +22,7 @@ RUN case "$TARGETARCH" in \
 FROM gcr.io/distroless/static-debian13:nonroot AS runtime
 WORKDIR /app
 COPY --from=build --chown=65532:65532 /app/server /app/server
+COPY --from=build --chown=65532:65532 /app/public /app/public
 USER 65532:65532
 ENV BIND_ADDRESS=0.0.0.0:3000 RUST_LOG=info
 EXPOSE 3000

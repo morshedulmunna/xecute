@@ -1,7 +1,7 @@
 //! Validated server settings; invalid limits fail startup rather than disable protection.
 
-use super::{CorsConfig, DocsConfig};
-use std::{env, net::SocketAddr, time::Duration};
+use super::{CorsConfig, DocsConfig, StaticConfig};
+use std::{net::SocketAddr, time::Duration};
 
 /// Typed, validated HTTP server configuration. Durations use monotonic clocks.
 #[derive(Clone, Debug)]
@@ -26,6 +26,8 @@ pub struct Config {
     pub cors: CorsConfig,
     /// Whether API documentation is exposed.
     pub docs: DocsConfig,
+    /// Dedicated public asset directory and mount prefix.
+    pub static_files: StaticConfig,
 }
 
 impl Default for Config {
@@ -41,6 +43,7 @@ impl Default for Config {
             rate_limit_max_clients: 10_000,
             cors: CorsConfig::default(),
             docs: DocsConfig::default(),
+            static_files: StaticConfig::default(),
         }
     }
 }
@@ -48,11 +51,7 @@ impl Default for Config {
 impl Config {
     /// Read process settings, supply safe defaults, and reject invalid values.
     pub fn from_env() -> Result<Self, String> {
-        Self::from_lookup(|key| match env::var(key) {
-            Ok(value) => Ok(Some(value)),
-            Err(env::VarError::NotPresent) => Ok(None),
-            Err(_) => Err(format!("{key} must be valid UTF-8")),
-        })
+        Self::from_lookup(super::read_env)
     }
 
     /// Accept an injectable source so tests can validate settings without mutating process state.
@@ -95,6 +94,7 @@ impl Config {
             rate_limit_max_clients: number("RATE_LIMIT_MAX_CLIENTS", 10_000, 1_000_000)? as usize,
             cors: CorsConfig::from_lookup(&lookup)?,
             docs: DocsConfig::from_lookup(&lookup)?,
+            static_files: StaticConfig::default(),
         })
     }
 }

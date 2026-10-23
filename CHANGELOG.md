@@ -7,8 +7,15 @@ created projects and resources.
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-10-23
+
 ### Added
 
+- A shared environment reader reused by generated server and logging configuration.
+
+- Default public static file serving with a generated example, GET/HEAD/range support, and private-path rejection.
+- JSON console/file logging using only LOG_STDOUT_ENABLED and LOG_FILE_DIR, with built-in daily rotation, retention, and shutdown flushing.
+- A composable tracing exporter layer hook for future cloud logging integrations.
 - A repository changelog and GitHub Release automation using the matching version
   section as release notes.
 
@@ -102,7 +109,8 @@ created projects and resources.
 - Added a root workspace manifest and build documentation.
 - Generated applications use runtime `xecute 0.1.4` and macros `xmacros 0.1.4`.
 
-[Unreleased]: https://github.com/morshedulmunna/xecute/compare/v0.1.10...HEAD
+[Unreleased]: https://github.com/morshedulmunna/xecute/compare/v0.1.11...HEAD
+[0.1.11]: https://github.com/morshedulmunna/xecute/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/morshedulmunna/xecute/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/morshedulmunna/xecute/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/morshedulmunna/xecute/compare/v0.1.7...v0.1.8

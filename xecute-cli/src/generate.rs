@@ -182,6 +182,19 @@ pub fn new_project(
         "xecute = \"0.1.6\"".to_owned()
     };
     let templates = [
+        (
+            "src/tests/static_files.rs",
+            include_str!("../templates/tests/static_files.rs"),
+        ),
+        (
+            "src/configs/static_files.rs",
+            include_str!("../templates/configs/static_files.rs"),
+        ),
+        (
+            "src/server/static_files.rs",
+            include_str!("../templates/server/static_files.rs"),
+        ),
+        ("public/hello.txt", "Static file serving is working.\n"),
         ("src/main.rs", include_str!("../templates/main.rs")),
         (
             "src/middleware.rs",
@@ -198,6 +211,10 @@ pub fn new_project(
         (
             "src/server/docs.rs",
             include_str!("../templates/server/docs.rs"),
+        ),
+        (
+            "src/configs/environment.rs",
+            include_str!("../templates/configs/environment.rs"),
         ),
         (
             "src/configs/mod.rs",
@@ -358,7 +375,7 @@ pub fn new_project(
         &root.join(".xecute/architecture"),
         &format!("{}\n", architecture.name()),
     )?;
-    write(&root.join(".gitignore"), "/target/\n.env\n")?;
+    write(&root.join(".gitignore"), "/target/\n.env\n/logs/\n")?;
     let mut formatted = Vec::new();
     for (path, template) in templates {
         if path.ends_with(".rs") {

@@ -14,6 +14,7 @@ pub fn router(app: Router, config: &Config) -> Router {
     // Share quota and concurrency state across all requests handled by this router.
     let state = middleware::state(config);
     let docs_enabled = config.docs.enabled;
+    let app = super::static_files::mount(app, &config.static_files);
 
     // Use the validated environment policy for browser cross-origin requests.
     let cors = CorsLayer::new()

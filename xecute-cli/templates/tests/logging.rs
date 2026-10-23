@@ -95,3 +95,68 @@ async fn logs_one_flat_completion_per_request_and_omits_private_request_values()
     assert!(!text.contains("private-query"));
     assert!(!text.contains("private-header"));
 }
+
+#[test]
+fn file_output_flushes_and_accepts_an_additional_exporter_layer() {
+    if std::env::var_os("XECUTE_FILE_LOG_TEST_CHILD").is_none() {
+        let directory = std::env::temp_dir().join(format!("xecute-log-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let module = module_path!().split_once("::").unwrap().1;
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", &format!("{module}::file_output_flushes_and_accepts_an_additional_exporter_layer"), "--test-threads=1"])
+            .env("XECUTE_FILE_LOG_TEST_CHILD", "1").env("RUST_LOG", "info")
+            .env("LOG_STDOUT_ENABLED", "false")
+            .env("LOG_FILE_DIR", &directory).status().unwrap();
+        assert!(status.success());
+        let path = std::fs::read_dir(&directory).unwrap().next().unwrap().unwrap().path();
+        let content = std::fs::read_to_string(path).unwrap();
+        let events: Vec<serde_json::Value> = content.lines().map(|line| serde_json::from_str(line).unwrap()).collect();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0]["message"], "file and exporter event");
+        assert_eq!(events[0]["answer"], 42);
+        assert!(events[0].get("fields").is_none());
+        std::fs::remove_dir_all(directory).unwrap();
+        return;
+    }
+    struct Exporter(Arc<std::sync::atomic::AtomicUsize>);
+    impl tracing_subscriber::Layer<tracing_subscriber::Registry> for Exporter {
+        fn on_event(&self, _: &tracing::Event<'_>, _: tracing_subscriber::layer::Context<'_, tracing_subscriber::Registry>) {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+    let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let guard = crate::server::logging::init_with_layer(&Config::default(), Exporter(count.clone())).unwrap();
+    tracing::info!(answer = 42, "file and exporter event");
+    assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 1);
+    drop(guard);
+}
+
+#[test]
+fn logger_config_uses_two_settings() {
+    use crate::configs::LoggingConfig;
+    assert!(LoggingConfig::from_lookup(|_| Ok(None)).unwrap().stdout);
+    assert!(!LoggingConfig::from_lookup(|_| Ok(None)).unwrap().file_enabled);
+    assert!(!LoggingConfig::from_lookup(|key| Ok((key == "LOG_FILE_DIR").then(String::new))).unwrap().file_enabled);
+    let config = LoggingConfig::from_lookup(|key| Ok(match key {
+        "LOG_STDOUT_ENABLED" => Some("false".into()),
+        "LOG_FILE_DIR" => Some("logs".into()),
+        _ => None,
+    })).unwrap();
+    assert!(!config.stdout);
+    assert!(config.file_enabled);
+    assert_eq!(config.filename, "app");
+    assert_eq!(config.rotation, "daily");
+    assert_eq!(config.max_files, 7);
+    assert!(LoggingConfig::from_lookup(|key| Ok((key == "LOG_STDOUT_ENABLED").then(|| "invalid".into()))).is_err());
+}
+
+#[test]
+fn public_log_destinations_are_rejected_before_creating_files() {
+    let root = std::env::temp_dir().join(format!("xecute-private-log-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&root).unwrap();
+    let config = Config { static_files: crate::configs::StaticConfig { directory: root.clone(), ..Default::default() }, ..Default::default() };
+    let logging = crate::configs::LoggingConfig::from_lookup(|key| Ok((key == "LOG_FILE_DIR").then(|| root.join("logs").to_string_lossy().into_owned()))).unwrap();
+    assert!(crate::server::logging::validate_output_paths(&config, &logging).is_err());
+    assert!(!root.join("logs").exists());
+    std::fs::remove_dir_all(root).unwrap();
+}
