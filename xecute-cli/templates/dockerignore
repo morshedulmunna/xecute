@@ -1,0 +1,9 @@
+# Keep credentials, local state, and build output out of the Docker build context.
+/target
+/.git
+/.github
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store

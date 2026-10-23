@@ -1,0 +1,18 @@
+[package]
+name = "xecute-cli"
+version = "0.1.5"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "NestJS-style project and resource generator for Xecute"
+repository = "https://github.com/xecuteai/xecuteai"
+readme = "README.md"
+keywords = ["cli", "axum", "code-generation", "dependency-injection"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "xecute"
+path = "src/main.rs"
+
+[lints]
+workspace = true

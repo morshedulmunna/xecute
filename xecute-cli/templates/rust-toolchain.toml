@@ -1,0 +1,5 @@
+# Pin compiler and quality-tool versions consistently for developers and CI.
+[toolchain]
+channel = "1.98.1"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

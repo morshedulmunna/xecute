@@ -1,0 +1,44 @@
+# Private application manifest; commit Cargo.lock for reproducible builds.
+[package]
+name = "__PROJECT_NAME__"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98.1"
+publish = false
+
+[workspace]
+
+[dependencies]
+validator = { version = "0.20", features = ["derive"] }
+__RUNTIME_DEPENDENCY__
+axum = "0.8"
+schemars = "1.2"
+utoipa-swagger-ui = { version = "9", features = ["axum", "vendored"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal", "time", "sync"] }
+dotenvy = "0.15"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+uuid = { version = "1", features = ["v4"] }
+tower-http = { version = "0.6", features = ["catch-panic", "cors", "limit"] }
+
+[dev-dependencies]
+utoipa = "5"
+tower = { version = "0.5", features = ["util"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+# Rust warns when public API items lack /// documentation.
+missing_docs = "warn"
+
+[lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+
+# Thin LTO and one codegen unit reduce the shipped binary; retain unwind for panic handling.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

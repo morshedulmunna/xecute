@@ -1,0 +1,39 @@
+# Verify Rust quality checks, the runnable distroless image, and dependency policies.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain
+        run: rustup show active-toolchain
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets --all-features --locked -- -D warnings
+      - run: cargo test --all-targets --all-features --locked
+      - run: cargo build --release --locked
+      - name: Verify container build
+        run: docker build --tag app:ci .
+      - name: Verify distroless server starts
+        run: |
+          docker run --detach --name app-smoke -p 127.0.0.1:3000:3000 app:ci
+          curl --fail --retry 10 --retry-delay 1 --retry-connrefused http://127.0.0.1:3000/health/ready
+          docker stop --timeout 15 app-smoke
+      - name: Clean up smoke container
+        if: always()
+        run: docker rm --force app-smoke || true
+
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show active-toolchain
+      - run: cargo install cargo-deny --version 0.20.2 --locked
+      - run: cargo deny --locked check
