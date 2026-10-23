@@ -184,7 +184,8 @@ Existing applications require the server changes; CLI updates do not rewrite the
 
 ## Static files
 
-Newly generated applications include `public/hello.txt`, served at
+Newly generated applications include `public/index.html`, served at `/static` and
+`/static/`, plus `public/hello.txt`, served at
 `http://127.0.0.1:3000/static/hello.txt`. Static serving is enabled by default,
 without environment settings. Add files to `public/` and access them at `/static/<filename>`.
 For example, `public/images/logo.png` is served at `/static/images/logo.png`.
@@ -193,8 +194,8 @@ To customize the directory, prefix, or enabled state, edit `StaticConfig` in
 directory; the public directory must exist and cannot be the application root or a symlink.
 
 Files support GET, HEAD, MIME types, conditional requests, and byte ranges through
-Tower HTTP `ServeDir`. Directory listings and implicit `index.html` responses are
-disabled; use explicit filenames. Hidden path components, parent traversal, and
+Tower HTTP `ServeDir`. Directory listings and nested directory indexes are disabled. The mount root
+serves `public/index.html`; other assets use explicit filenames. Hidden path components, parent traversal, and
 symlinked assets are rejected. Keep public directories limited to intended public
 assets; static files share the application's CORS, request IDs, security headers,
 logging, rate limits, and global middleware. HTML retains the restrictive API CSP;

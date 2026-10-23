@@ -10,6 +10,7 @@ async fn public_assets_support_get_head_ranges_and_reject_private_paths() {
     let root = std::env::temp_dir().join(format!("xecute-assets-{}", uuid::Uuid::new_v4()));
     let public = root.join("public");
     std::fs::create_dir_all(&public).unwrap();
+    std::fs::write(public.join("index.html"), "<h1>Static example</h1>").unwrap();
     std::fs::write(public.join("asset.txt"), "hello world").unwrap();
     std::fs::write(public.join(".env"), "PRIVATE").unwrap();
     std::fs::write(root.join("outside.txt"), "PRIVATE").unwrap();
@@ -18,6 +19,11 @@ async fn public_assets_support_get_head_ranges_and_reject_private_paths() {
     let mut config = Config { static_files: StaticConfig { enabled: true, directory: public, mount: "/assets".into() }, ..Config::default() };
     server::static_files::validate(&config.static_files).unwrap();
     let app = server::router(Router::new(), &config);
+    for path in ["/assets", "/assets/", "/assets?example=1"] {
+        let response = app.clone().oneshot(request(path, "127.0.0.1")).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK, "{path}");
+        assert_eq!(to_bytes(response.into_body(), 1024).await.unwrap(), "<h1>Static example</h1>");
+    }
     let response = app.clone().oneshot(request("/assets/asset.txt", "127.0.0.1")).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     assert!(response.headers()[header::CONTENT_TYPE].to_str().unwrap().starts_with("text/plain"));

@@ -42,6 +42,7 @@ fn new_project_is_formatted_locked_and_accepts_resources() {
         "src/server/static_files.rs",
         "src/tests/static_files.rs",
         "public/hello.txt",
+        "public/index.html",
         "src/configs/docs.rs",
         "src/configs/environment.rs",
         "src/modules/example/module.rs",

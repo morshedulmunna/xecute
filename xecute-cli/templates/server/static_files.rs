@@ -27,7 +27,7 @@ pub fn mount(router: Router, config: &StaticConfig) -> Router {
     router.merge(assets)
 }
 
-async fn restrict(State(config): State<Arc<StaticConfig>>, request: Request, next: Next) -> Response {
+async fn restrict(State(config): State<Arc<StaticConfig>>, mut request: Request, next: Next) -> Response {
     let raw = request.uri().path().strip_prefix(&config.mount).unwrap_or("");
     let Ok(path) = percent_encoding::percent_decode_str(raw).decode_utf8() else { return StatusCode::NOT_FOUND.into_response(); };
     let mut current: PathBuf = config.directory.clone();
@@ -39,6 +39,21 @@ async fn restrict(State(config): State<Arc<StaticConfig>>, request: Request, nex
         }
         current.push(component);
         if !allowed(&current).await { return StatusCode::NOT_FOUND.into_response(); }
+    }
+    // Serve the explicit landing example for both mount URLs, without directory listings.
+    if path.is_empty() || path == "/" {
+        if !tokio::fs::symlink_metadata(config.directory.join("index.html")).await
+            .is_ok_and(|metadata| metadata.is_file() && !metadata.file_type().is_symlink()) {
+            return StatusCode::NOT_FOUND.into_response();
+        }
+        let mut parts = request.uri().clone().into_parts();
+        let target = format!("{}/index.html", config.mount);
+        let target = match request.uri().query() {
+            Some(query) => format!("{target}?{query}"),
+            None => target,
+        };
+        parts.path_and_query = Some(target.parse().expect("valid static mount path"));
+        *request.uri_mut() = axum::http::Uri::from_parts(parts).expect("valid static asset URI");
     }
     next.run(request).await
 }

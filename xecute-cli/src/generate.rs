@@ -194,6 +194,10 @@ pub fn new_project(
             "src/server/static_files.rs",
             include_str!("../templates/server/static_files.rs"),
         ),
+        (
+            "public/index.html",
+            "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Xecute static files</title><h1>Static file serving is working</h1><p>Edit public/index.html or add files to public/.</p><a href=\"/static/hello.txt\">Example text file</a></html>\n",
+        ),
         ("public/hello.txt", "Static file serving is working.\n"),
         ("src/main.rs", include_str!("../templates/main.rs")),
         (

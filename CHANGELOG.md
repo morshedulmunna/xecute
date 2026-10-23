@@ -7,6 +7,10 @@ created projects and resources.
 
 ## [Unreleased]
 
+### Fixed
+
+- Serve a generated static landing page at both `/static` and `/static/`.
+
 ## [0.1.11] - 2026-10-23
 
 ### Added
