@@ -1,0 +1,65 @@
+name: Publish GitHub release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+    branches:
+      - main
+    paths:
+      - CHANGELOG.md
+      - .github/workflows/release.yml
+      - scripts/release_notes.py
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing CLI tag (for example v0.1.10); blank selects newest changelog entry'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare release notes from the changelog
+        id: notes
+        env:
+          RELEASE_TAG: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+        run: python3 scripts/release_notes.py --tag "$RELEASE_TAG" --output release-notes.md
+      - name: Require a published version tag
+        if: steps.notes.outputs.exists != 'true'
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          if [[ "$EVENT" == "workflow_dispatch" || "$REF_TYPE" == "tag" ]]; then
+            echo "The selected tag does not exist. Publish the crate and push its tag first."
+            exit 1
+          fi
+          echo "Version tag not pushed yet; release creation deferred."
+      - name: Create or update the GitHub release
+        if: steps.notes.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.notes.outputs.tag }}
+          IS_LATEST: ${{ steps.notes.outputs.latest }}
+        run: |
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --verify-tag --title "Xecute CLI $RELEASE_TAG" --notes-file release-notes.md --latest="$IS_LATEST"
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --title "Xecute CLI $RELEASE_TAG" --notes-file release-notes.md --latest="$IS_LATEST"
+          fi
