@@ -45,7 +45,7 @@ No `#[path]` annotations are generated. Existing component folders are never
 overwritten. Run generation from the project root. Automatic registration uses
 the comments in `app_module.rs`; keep these markers when editing that file.
 
-Generated projects use `xecute = "0.1.5"` from crates.io by default.
+Generated projects use `xecute = "0.1.6"` from crates.io by default.
 Use `xecute new my-api --runtime-path /path/to/xecute/xecute` for local development.
 
 Generated CQRS resource folders contain `module.rs`, `controller.rs`,
@@ -109,8 +109,7 @@ not included. This command is available starting with CLI 0.1.7.
 
 ## CLI management and current-directory initialization
 
-The following commands are implemented in the local checkout and await the next
-CLI release:
+The following commands are available starting with CLI 0.1.8:
 
 ```sh
 xecute update

@@ -238,7 +238,7 @@ single run and a release build for production. Hot reload is development-only.
 
 ## CLI management
 
-With a CLI version containing the management commands, use `xecute update` to
+With CLI 0.1.8 or later, use `xecute update` to
 install the latest registry CLI and `xecute uninstall` to remove the installed
 CLI. These target the running executable's Cargo installation root and preserve
 this application's files. Updating the CLI does not update this project's runtime

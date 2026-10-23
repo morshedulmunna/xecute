@@ -1,6 +1,6 @@
 [package]
 name = "xecute"
-version = "0.1.5"
+version = "0.1.6"
 edition.workspace = true
 rust-version.workspace = true
 description = "Modules and dependency injection for Axum"

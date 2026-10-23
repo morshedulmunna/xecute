@@ -179,7 +179,7 @@ pub fn new_project(
             .replace('"', "\\\"");
         format!("xecute = {{ path = \"{runtime}\" }}")
     } else {
-        "xecute = \"0.1.5\"".to_owned()
+        "xecute = \"0.1.6\"".to_owned()
     };
     let templates = [
         ("src/main.rs", include_str!("../templates/main.rs")),
@@ -587,11 +587,12 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
                         .split_once('=')
                         .is_some_and(|(key, _)| key.trim() == "xecute")
                     {
-                        line.replace("\"0.1.0\"", "\"0.1.5\"")
-                            .replace("\"0.1.1\"", "\"0.1.5\"")
-                            .replace("\"0.1.2\"", "\"0.1.5\"")
-                            .replace("\"0.1.3\"", "\"0.1.5\"")
-                            .replace("\"0.1.4\"", "\"0.1.5\"")
+                        line.replace("\"0.1.0\"", "\"0.1.6\"")
+                            .replace("\"0.1.1\"", "\"0.1.6\"")
+                            .replace("\"0.1.2\"", "\"0.1.6\"")
+                            .replace("\"0.1.3\"", "\"0.1.6\"")
+                            .replace("\"0.1.4\"", "\"0.1.6\"")
+                            .replace("\"0.1.5\"", "\"0.1.6\"")
                     } else {
                         line.to_owned()
                     }

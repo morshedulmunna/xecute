@@ -31,7 +31,7 @@ use an injectable repository and validated request DTOs.
 
 ## Release status
 
-Published packages are `xecute-cli 0.1.7`, `xecute 0.1.5`, and `xmacros 0.1.5`.
+Published packages are `xecute-cli 0.1.8`, `xecute 0.1.6`, and `xmacros 0.1.5`.
 MVC is the default; CQRS is selected with `--cqrs`.
 
 This release includes `xecute run dev` with automatic development rebuild/restart,
@@ -39,8 +39,8 @@ app/controller/route middleware, the `Application` builder, and the generated
 `src/middleware.rs` configuration hook. Middleware requires runtime/macros 0.1.5
 or later; the dev runner requires CLI 0.1.7 or later.
 
-`xecute update`, `xecute uninstall`, and `xecute new .` are new additions in this
-working tree and await the next CLI release. Install the local CLI to use them.
+CLI 0.1.8 adds `xecute update`, `xecute uninstall`, and `xecute new .`, including
+custom package names through `--name` and safe in-place project initialization.
 
 ## Installation and quick start
 
@@ -51,9 +51,9 @@ Use a Rust installation with Cargo, rustfmt, and Clippy.
 Install the published CLI:
 
 ```sh
-cargo install xecute-cli --version 0.1.7 --locked
+cargo install xecute-cli --version 0.1.8 --locked
 # Update an existing installation:
-cargo install xecute-cli --version 0.1.7 --locked --force
+cargo install xecute-cli --version 0.1.8 --locked --force
 ```
 
 Create and run an MVC application:
