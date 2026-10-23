@@ -349,7 +349,7 @@ pub fn new_project(
     fs::create_dir_all(root.join("src")).map_err(|e| e.to_string())?;
     write(
         &root.join("Cargo.toml"),
-        &include_str!("../templates/Cargo.toml.tmpl")
+        &include_str!("../templates/Cargo.toml.in")
             .replace("__PROJECT_NAME__", name)
             .replace("__RUNTIME_DEPENDENCY__", &dependency),
     )?;
@@ -444,18 +444,18 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
         return Err("module already declared; no files changed".into());
     }
     let service = if kind == "resource" {
-        include_str!("../templates/resource/service.rs.tmpl")
+        include_str!("../templates/resource/service.rs")
     } else {
-        include_str!("../templates/resource/standalone_service.rs.tmpl")
+        include_str!("../templates/resource/standalone_service.rs")
     }
     .replace("__TYPE__", &pascal)
     .replace("__FEATURE__", &snake);
     let controller = if cqrs {
-        include_str!("../templates/cqrs/controller.rs.tmpl")
+        include_str!("../templates/cqrs/controller.rs")
     } else if kind == "resource" {
-        include_str!("../templates/resource/controller.rs.tmpl")
+        include_str!("../templates/resource/controller.rs")
     } else {
-        include_str!("../templates/resource/standalone_controller.rs.tmpl")
+        include_str!("../templates/resource/standalone_controller.rs")
     }
     .replace("__TYPE__", &pascal)
     .replace("__FEATURE__", &snake);
@@ -475,9 +475,9 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
     }
     if matches!(kind, "resource" | "module") {
         let module = if cqrs {
-            include_str!("../templates/cqrs/module.rs.tmpl").replace("__TYPE__", &pascal)
+            include_str!("../templates/cqrs/module.rs").replace("__TYPE__", &pascal)
         } else if kind == "resource" {
-            include_str!("../templates/resource/module.rs.tmpl").replace("__TYPE__", &pascal)
+            include_str!("../templates/resource/module.rs").replace("__TYPE__", &pascal)
         } else {
             format!(
                 "//! Dependency-injection boundary for the {snake} feature.\n//! Add injectable services and controllers to providers as the feature grows.\n\nuse xecute::module;\n\n/// Dependency-injection module.\n#[module(providers = [])]\npub struct {pascal}Module;\n"
@@ -506,15 +506,15 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
         for (name, template) in [
             (
                 "dto/mod.rs",
-                include_str!("../templates/resource/dto.rs.tmpl"),
+                include_str!("../templates/resource/dto.rs"),
             ),
             (
                 "entity/mod.rs",
-                include_str!("../templates/resource/entity.rs.tmpl"),
+                include_str!("../templates/resource/entity.rs"),
             ),
             (
                 "repository/store.rs",
-                include_str!("../templates/resource/repository.rs.tmpl"),
+                include_str!("../templates/resource/repository.rs"),
             ),
         ] {
             files.push((
@@ -531,11 +531,11 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
         for (path, template) in [
             (
                 "commands/create.rs",
-                include_str!("../templates/cqrs/create.rs.tmpl"),
+                include_str!("../templates/cqrs/create.rs"),
             ),
             (
                 "queries/list.rs",
-                include_str!("../templates/cqrs/list.rs.tmpl"),
+                include_str!("../templates/cqrs/list.rs"),
             ),
         ] {
             files.push((path.into(), template.replace("__TYPE__", &pascal)));
@@ -623,7 +623,7 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
         let path = root.join(format!("src/tests/{snake}.rs"));
         write(
             &path,
-            &include_str!("../templates/resource/tests.rs.tmpl").replace("__FEATURE__", &snake),
+            &include_str!("../templates/resource/tests.rs").replace("__FEATURE__", &snake),
         )?;
         write(&tests, &declarations)?;
         formatted.extend(["src/tests/mod.rs".into(), format!("src/tests/{snake}.rs")]);

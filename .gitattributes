@@ -1,0 +1,2 @@
+# Manifest input is TOML; Rust scaffolding templates use the .rs extension.
+*.toml.in linguist-language=TOML
