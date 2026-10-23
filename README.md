@@ -40,7 +40,7 @@ use an injectable repository and validated request DTOs.
 
 ## Release status
 
-Published packages are `xecute-cli 0.1.11`, `xecute 0.1.6`, and `xmacros 0.1.5`.
+Published packages are `xecute-cli 0.1.12`, `xecute 0.1.7`, and `xmacros 0.1.6`.
 MVC is the default; CQRS is selected with `--cqrs`.
 
 This release includes `xecute run dev` with automatic development rebuild/restart,
@@ -60,9 +60,9 @@ Use a Rust installation with Cargo, rustfmt, and Clippy.
 Install the published CLI:
 
 ```sh
-cargo install xecute-cli --version 0.1.11 --locked
+cargo install xecute-cli --version 0.1.12 --locked
 # Update an existing installation:
-cargo install xecute-cli --version 0.1.11 --locked --force
+cargo install xecute-cli --version 0.1.12 --locked --force
 ```
 
 Create and run an MVC application:
@@ -1120,10 +1120,9 @@ let timeout = file.range("server.request_timeout_seconds", 30, 1, 3600)?;
 
 ## Typed configuration
 
-These APIs are prepared for runtime 0.1.7/macros 0.1.6 and the next CLI release.
-Until those versions are published, generate with `--runtime-path /path/to/xecute`
-pointing to this repository's runtime crate and run `cargo test` to create the
-local dependency lockfile. Subsequent checks can use `--locked`.
+These APIs are available with CLI 0.1.12, runtime 0.1.7, and macros 0.1.6.
+Update the CLI before generating a new project. Existing applications require
+corresponding dependency and source changes; updating the CLI does not rewrite them.
 
 The common configuration boundary separates `ConfigFile` for ordinary settings
 from `Env` for secrets. Both report value-redacted validation errors. TOML parsing

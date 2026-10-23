@@ -7,6 +7,10 @@ created projects and resources.
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-10-23
+
+Packages: `xecute-cli 0.1.12`, `xecute 0.1.7`, and `xmacros 0.1.6`.
+
 ### Added
 
 - Streaming multipart uploads with actual size/count limits, MIME signature checks,
@@ -33,7 +37,7 @@ created projects and resources.
   validated at startup, and the same snapshot configures server and logging.
 
 - Generated applications use runtime 0.1.7 and macros 0.1.6 APIs. These package
-  versions are prepared locally until the next release; use `--runtime-path` for local validation.
+  versions are published alongside CLI 0.1.12.
 - Provider construction errors are cached per scope; undeclared factory dependencies
   and missing required registrations now fail explicitly.
 
@@ -144,10 +148,12 @@ created projects and resources.
 - Added a root workspace manifest and build documentation.
 - Generated applications use runtime `xecute 0.1.4` and macros `xmacros 0.1.4`.
 
-[Unreleased]: https://github.com/morshedulmunna/xecute/compare/v0.1.11...HEAD
+[Unreleased]: https://github.com/morshedulmunna/xecute/compare/v0.1.12...HEAD
 [0.1.11]: https://github.com/morshedulmunna/xecute/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/morshedulmunna/xecute/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/morshedulmunna/xecute/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/morshedulmunna/xecute/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/morshedulmunna/xecute/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/morshedulmunna/xecute/releases/tag/v0.1.6
+
+[0.1.12]: https://github.com/morshedulmunna/xecute/compare/v0.1.11...v0.1.12

@@ -442,10 +442,9 @@ let timeout = file.range("server.request_timeout_seconds", 30, 1, 3600)?;
 
 ## Typed configuration
 
-These APIs are prepared for runtime 0.1.7/macros 0.1.6 and the next CLI release.
-Until those versions are published, generate with `--runtime-path /path/to/xecute`
-pointing to this repository's runtime crate and run `cargo test` to create the
-local dependency lockfile. Subsequent checks can use `--locked`.
+These APIs are available with CLI 0.1.12, runtime 0.1.7, and macros 0.1.6.
+Update the CLI before generating a new project. Existing applications require
+corresponding dependency and source changes; updating the CLI does not rewrite them.
 
 The common configuration boundary separates `ConfigFile` for ordinary settings
 from `Env` for secrets. Both report value-redacted validation errors. TOML parsing
