@@ -22,6 +22,7 @@ const SHUTDOWN: Duration = Duration::from_secs(5);
 #[derive(Default)]
 pub struct Options {
     binary: Option<String>,
+    features: Vec<String>,
     watch: Vec<PathBuf>,
     arguments: Vec<String>,
 }
@@ -42,6 +43,13 @@ impl Options {
                         .filter(|v| !v.starts_with('-') && !v.is_empty())
                         .ok_or("--bin requires a binary name")?;
                     options.binary = Some(value.clone());
+                }
+                "--features" => {
+                    let value = arguments
+                        .next()
+                        .filter(|value| !value.starts_with('-') && !value.trim().is_empty())
+                        .ok_or("--features requires a Cargo feature list")?;
+                    options.features.push(value.clone());
                 }
                 "--watch" => {
                     let value = arguments
@@ -157,6 +165,9 @@ impl Process {
         command.current_dir(root).arg("run");
         if let Some(binary) = &options.binary {
             command.args(["--bin", binary]);
+        }
+        for features in &options.features {
+            command.args(["--features", features]);
         }
         if !options.arguments.is_empty() {
             command.arg("--").args(&options.arguments);
@@ -316,6 +327,8 @@ mod tests {
             "server",
             "--watch",
             "../runtime",
+            "--features",
+            "s3",
             "--",
             "--port",
             "4000",
@@ -323,10 +336,12 @@ mod tests {
         .map(String::from);
         let options = Options::parse(&args).unwrap();
         assert_eq!(options.binary.as_deref(), Some("server"));
+        assert_eq!(options.features, ["s3"]);
         assert_eq!(options.arguments, ["--port", "4000"]);
         assert_eq!(options.watch, [PathBuf::from("../runtime")]);
         for args in [
             vec!["--watch"],
+            vec!["--features"],
             vec!["--bin"],
             vec!["--bin", "a", "--bin", "b"],
             vec!["--release"],

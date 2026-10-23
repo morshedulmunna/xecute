@@ -15,10 +15,15 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _logging = logging::init(&config)?;
 
     // Resolve application dependencies and apply the shared HTTP policies.
-    let app = app_module::AppModule::router()?.merge(super::docs::router(
-        &config,
-        app_module::AppModule::api_operations(),
-    )?);
+    let container = Arc::new(app_module::AppModule::container()?);
+    let app = app_module::AppModule::router_with_container(container.clone())?
+        .merge(crate::modules::uploads::UploadModule::router_with_container(&config, container).await?);
+    let mut operations = app_module::AppModule::api_operations();
+    operations.extend(crate::modules::uploads::UploadModule::api_operations(&config));
+    let versions = super::versions::groups(&config, app.clone(), operations.clone())?;
+    let app = versions.mount(app)
+        .merge(super::docs::router(&config, operations)?)
+        .merge(super::docs::versioned_router(&config, &versions)?);
     let app = super::router(app, &config);
 
     // Bind before announcing readiness; report the actual address assigned by the OS.
@@ -29,6 +34,10 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if config.docs.enabled {
         tracing::info!(url = %format!("{url}/docs/"), "Swagger UI available");
         tracing::info!(url = %format!("{url}/docs/openapi.json"), "OpenAPI document available");
+        for version in versions.versions() {
+            tracing::info!(api_version = version.name(), url = %format!("{url}/docs/{}/", version.name()), "Versioned Swagger UI available");
+            tracing::info!(api_version = version.name(), url = %format!("{url}/docs/{}/openapi.json", version.name()), "Versioned OpenAPI document available");
+        }
     } else {
         tracing::info!("Swagger documentation disabled (docs.enabled=false)");
     }

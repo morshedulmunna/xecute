@@ -18,6 +18,10 @@ pub use xmacros::*;
 pub mod middleware;
 pub use middleware::Application;
 
+/// Streaming multipart uploads with private local and optional S3 storage.
+#[cfg(feature = "upload")]
+pub mod upload;
+
 /// In-process HTTP tests and isolated provider overrides.
 #[cfg(feature = "testing")]
 pub mod testing;
@@ -33,8 +37,11 @@ pub mod exceptions;
 
 mod http;
 mod openapi;
+/// Explicit route version groups and per-version OpenAPI metadata.
+pub mod versioning;
 pub use http::{ApiOperation, ApiResponse, HttpError, HttpStatus, ValidatedJson, ValidatedQuery};
 pub use openapi::{DocumentationError, json_schema, openapi_document};
+pub use versioning::{ApiVersion, ApiVersions, VersionError};
 
 /// Common controller types and macros.
 pub mod prelude {

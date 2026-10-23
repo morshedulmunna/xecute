@@ -543,3 +543,177 @@ The generated `src/tests/application.rs` demonstrates isolated container startup
 and safe mapped errors. Resource tests demonstrate JSON validation and storage
 through the same test client. The runtime test suite also covers trait adapters,
 mock isolation, concurrent initialization, nested request scopes, and cleanup.
+
+## Multipart file uploads
+
+Generated projects include `src/modules/uploads/` with a controller and async
+startup module. Enable private writes explicitly in `AppConfig.toml`:
+
+```toml
+[uploads]
+enabled = true
+storage = "local"
+directory = "storage/uploads"
+max_files = 4
+max_file_bytes = 524288
+max_total_bytes = 524288
+allowed_types = ["image/png", "image/jpeg", "application/pdf"]
+```
+
+The endpoint accepts repeated `file` parts:
+
+```sh
+curl -F 'file=@report.pdf;type=application/pdf' http://127.0.0.1:3000/uploads
+curl -F 'file=@photo.png;type=image/png' -F 'file=@report.pdf;type=application/pdf' \
+  http://127.0.0.1:3000/v1/uploads
+```
+
+A successful request returns 201 with an array of metadata containing `key`,
+`original_name`, `content_type`, `size`, and `sha256`. Generated UUID keys never
+use client filenames. Local objects and staging files stay outside `public/`;
+there is no public download route. Persist returned metadata in your own database
+and implement authorized retrieval/deletion according to your application rules.
+Attach authentication/permissions using the existing controller/route middleware
+before enabling upload writes in a deployed application.
+
+The runtime streams each part to a temporary file and keeps only an 8 KiB sniff
+sample plus hashing state in memory. It checks actual per-file and aggregate
+bytes, file count, nonempty content, safe display filenames, and an exact MIME
+allowlist. Declared MIME must match an `infer`-recognized file signature; unknown
+formats and mismatches are rejected. Signature recognition is not a full decoder,
+malware scan, or content moderation system. Add those checks before publishing
+files when your application needs them. Text form fields are not part of this
+example contract; only repeated `file` fields are accepted.
+
+| Failure | Status |
+| --- | --- |
+| Malformed multipart, unexpected field, unsafe filename | 400 |
+| File content, aggregate bytes, or HTTP body limit exceeded | 413 |
+| Unrecognized, mismatched, or disallowed MIME type | 415 |
+| Missing/empty file or too many files | 422 |
+| Storage provider failure | 500 with safe public details |
+
+`server.body_limit_bytes` also bounds multipart framing and headers. When uploads
+are enabled, startup requires it to cover `uploads.max_total_bytes + 65536` bytes.
+To accept larger files, increase both limits explicitly. HTTP deadlines and global
+rate/concurrency policies still apply. The low-level `UploadService` expects its
+caller to apply an HTTP body limit as well; payload limits alone do not bound
+multipart headers or framing.
+
+All files validate before any storage commit. Invalid batches remove staging
+files without writing final objects. Local storage publishes complete files
+atomically without replacing an existing key. Handled storage failures trigger
+best-effort deletion of previously committed batch objects. A process crash,
+cancelled request, or uncertain S3 response can leave staging/committed objects;
+use application reconciliation, disk quotas, and retention/cleanup appropriate to
+your deployment. Stored objects do not expire automatically. Keep upload storage
+and staging directories private and unavailable for untrusted filesystem writes.
+
+### S3 storage
+
+S3 is an optional Cargo feature; local uploads do not compile the AWS SDK.
+Ordinary backend settings stay in `AppConfig.toml`:
+
+```toml
+[uploads]
+enabled = true
+storage = "s3"
+directory = "storage/uploads" # private streaming staging directory
+max_files = 4
+max_file_bytes = 524288
+max_total_bytes = 524288
+allowed_types = ["image/png", "image/jpeg", "application/pdf"]
+
+[uploads.s3]
+bucket = "my-private-bucket"
+region = "us-east-1"
+endpoint = "" # AWS default; set an HTTPS URL for an S3-compatible service
+prefix = "uploads"
+force_path_style = false
+allow_http = false
+```
+
+Use workload credentials or the standard AWS credential provider chain. For local
+static credentials, put only `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and an
+optional `AWS_SESSION_TOKEN` in `.env`; never put them in TOML. Compile/run with:
+
+```sh
+xecute run dev --features s3
+cargo run --features s3
+# Container image with the optional SDK:
+docker build --build-arg CARGO_FEATURES=s3 -t my-app .
+```
+
+For local MinIO, configure `endpoint`, `force_path_style = true`, and explicitly
+set `allow_http = true` only if the development endpoint uses HTTP. Embedded
+credentials, query strings, and endpoint paths are rejected. The adapter uses the
+official AWS SDK, streams retryable file bodies, supplies MIME/checksum metadata,
+and uses conditional `If-None-Match: *` writes. It never creates buckets, changes
+ACLs, or makes objects public. Provision a bucket and scoped PutObject/DeleteObject
+permissions, plus KMS permissions if required by its encryption policy. Bucket
+versioning, lifecycle, encryption, and application metadata retention remain
+operator/application choices.
+
+Runtime users enable `xecute/upload` for `UploadPolicy`, `UploadService`,
+`LocalStorage`, and the `UploadStorage` adapter trait; `upload-s3` adds `S3Storage`.
+`S3Storage::new` accepts an application-configured AWS client; `from_environment`
+uses the standard credential chain. `#[multipart]` inside a `#[routes]` method
+produces the matching multipart OpenAPI schema and cannot be combined with JSON
+body metadata. The example Swagger page can submit repeated file fields.
+
+Tests cover invalid batches, count/size limits, request framing limits, generated
+keys, private storage, temporary-file cleanup, and handled-failure rollback. A
+local mock S3 endpoint verifies signed conditional PUT, streamed content, metadata,
+and DELETE; no live cloud bucket or real credentials are used by the tests.
+
+## API version groups and separate OpenAPI documents
+
+Generated applications explicitly register version groups in
+`src/server/versions.rs`:
+
+| URL | Contract |
+| --- | --- |
+| `/example` | Existing unversioned resource alias |
+| `/v1/example` | Version-one resources, using the same v1 service/container |
+| `/v1/uploads` | Version-one upload endpoint when uploads are enabled |
+| `/v2/status` | Independent v2 example from `src/modules/api_v2/` |
+| `/docs/v1/` | Version-one Swagger UI |
+| `/docs/v1/openapi.json` | Version-one contract, with `/v1/...` paths |
+| `/docs/v2/` | Version-two Swagger UI |
+| `/docs/v2/openapi.json` | Version-two contract, with `/v2/...` paths |
+
+`/docs/` and `/docs/openapi.json` continue to describe the unversioned aliases.
+Each version has its own routes, operation IDs, and schema components; v2 does
+not automatically inherit v1 resources. Add v2-specific modules/controllers to
+its router as the contract evolves. Use a separate DI container when a version
+needs independently constructed provider instances.
+
+```rust
+use xecute::{ApiVersion, ApiVersions};
+
+let versions = ApiVersions::new()
+    .with(ApiVersion::new("v1", v1_router, V1Controller::api_operations())?)?
+    .with(ApiVersion::new("v2", v2_router, V2Controller::api_operations())?)?;
+let router = versions.mount(axum::Router::new());
+let documents = versions.documents("My API")?;
+```
+
+Supply controller paths relative to the group; the router and documented paths
+receive the same prefix. Canonical labels are `v1`, `v2`, etc, with positive u32
+version numbers. Invalid labels, duplicate groups, and conflicting contracts fail
+before serving. The same operation ID/schema name may appear in different
+version documents. Global application policies wrap all groups.
+
+```toml
+[api]
+versioning_enabled = true
+
+[docs]
+enabled = true
+```
+
+Set `api.versioning_enabled = false` to keep only unversioned aliases. Set
+`docs.enabled = false` to hide all Swagger/OpenAPI routes while keeping API routes
+active. Startup logs include each enabled version's Swagger and OpenAPI URLs.
+The registration pattern is explicit URL versioning; header-based versioning and
+automatic deprecation/sunset behavior are not implied.

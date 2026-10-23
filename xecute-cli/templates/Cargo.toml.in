@@ -8,6 +8,10 @@ publish = false
 
 [workspace]
 
+[features]
+default = []
+s3 = ["xecute/upload-s3"]
+
 [dependencies]
 validator = { version = "0.20", features = ["derive"] }
 __RUNTIME_DEPENDENCY__
@@ -26,6 +30,7 @@ uuid = { version = "1", features = ["v4"] }
 tower-http = { version = "0.6", features = ["catch-panic", "cors", "limit", "fs"] }
 
 [dev-dependencies]
+tempfile = "3"
 __RUNTIME_TEST_DEPENDENCY__
 utoipa = "5"
 tower = { version = "0.5", features = ["util"] }

@@ -124,7 +124,7 @@ where
 }
 
 /// Documentation attached to one declared controller response.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ApiResponse {
     /// HTTP response status.
     pub status: u16,
@@ -137,7 +137,7 @@ pub struct ApiResponse {
 }
 
 /// Route documentation collected by `#[routes]`; this is metadata, not an OpenAPI schema.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ApiOperation {
     /// HTTP method.
     pub method: &'static str,
@@ -149,7 +149,7 @@ pub struct ApiOperation {
     pub tag: &'static str,
     /// Stable operation identifier.
     pub operation_id: &'static str,
-    /// Rust DTO name for the JSON body, if declared.
+    /// Rust DTO name for JSON, or multipart/form-data for a multipart request.
     pub body_type: Option<&'static str>,
     /// JSON Schema describing the request payload.
     pub body_schema: Option<serde_json::Value>,

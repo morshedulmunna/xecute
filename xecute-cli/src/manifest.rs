@@ -45,6 +45,14 @@ fn enable_testing(item: &mut Item) -> Result<(), String> {
     Ok(())
 }
 
+pub(crate) fn testing_dependency(declaration: &str) -> Result<String, String> {
+    let mut document = declaration
+        .parse::<DocumentMut>()
+        .map_err(|_| "invalid runtime declaration")?;
+    enable_testing(&mut document["xecute"])?;
+    Ok(document.to_string().trim().to_owned())
+}
+
 pub(crate) fn resource_dependencies(manifest: &str) -> Result<String, String> {
     let mut document = manifest
         .parse::<DocumentMut>()

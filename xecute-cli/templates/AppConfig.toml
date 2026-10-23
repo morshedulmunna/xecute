@@ -29,3 +29,24 @@ filter = "info"
 stdout_enabled = true
 # A nonempty directory enables file output; use "" for console only.
 file_dir = "logs"
+
+[api]
+versioning_enabled = true
+
+[uploads]
+# Enable explicitly when the application is ready to accept private file writes.
+enabled = false
+storage = "local"
+directory = "storage/uploads"
+max_files = 4
+max_file_bytes = 524288
+max_total_bytes = 524288
+allowed_types = ["image/png", "image/jpeg", "application/pdf"]
+
+[uploads.s3]
+bucket = ""
+region = "us-east-1"
+endpoint = ""
+prefix = "uploads"
+force_path_style = false
+allow_http = false

@@ -43,3 +43,17 @@ pub fn router(
         )
         .layer(middleware::map_response(mark_documentation)))
 }
+
+/// Mount independent Swagger UIs and OpenAPI JSON for each enabled API version.
+pub fn versioned_router(config: &Config, versions: &xecute::ApiVersions) -> Result<Router, DocumentationError> {
+    let mut router = Router::new();
+    if !config.docs.enabled { return Ok(router); }
+    for (version, document) in versions.documents(env!("CARGO_PKG_NAME"))? {
+        router = router.merge(
+            SwaggerUi::new(format!("/docs/{version}"))
+                .external_url_unchecked(format!("/docs/{version}/openapi.json"), document)
+                .config(SwaggerConfig::default().validator_url("none").query_config_enabled(false))
+        );
+    }
+    Ok(router.layer(middleware::map_response(mark_documentation)))
+}

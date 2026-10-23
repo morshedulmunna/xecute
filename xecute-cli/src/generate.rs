@@ -177,19 +177,52 @@ pub fn new_project(
             .ok_or("runtime path must be UTF-8")?
             .replace('\\', "\\\\")
             .replace('"', "\\\"");
-        format!("xecute = {{ path = \"{runtime}\" }}")
+        format!("xecute = {{ path = \"{runtime}\", features = [\"upload\"] }}")
     } else {
-        "xecute = \"0.1.7\"".to_owned()
+        "xecute = { version = \"0.1.7\", features = [\"upload\"] }".to_owned()
     };
-    let test_dependency = if dependency.ends_with(" }") {
-        format!(
-            "{}, features = [\"testing\"] }}",
-            dependency.trim_end_matches(" }")
-        )
-    } else {
-        "xecute = { version = \"0.1.7\", features = [\"testing\"] }".to_owned()
-    };
+    let test_dependency = crate::manifest::testing_dependency(&dependency)?;
     let templates = [
+        (
+            "src/tests/uploads.rs",
+            include_str!("../templates/tests/uploads.rs"),
+        ),
+        (
+            "src/tests/versions.rs",
+            include_str!("../templates/tests/versions.rs"),
+        ),
+        (
+            "src/configs/uploads.rs",
+            include_str!("../templates/configs/uploads.rs"),
+        ),
+        (
+            "src/server/versions.rs",
+            include_str!("../templates/server/versions.rs"),
+        ),
+        (
+            "src/modules/uploads/mod.rs",
+            include_str!("../templates/uploads/mod.rs"),
+        ),
+        (
+            "src/modules/uploads/module.rs",
+            include_str!("../templates/uploads/module.rs"),
+        ),
+        (
+            "src/modules/uploads/controller.rs",
+            include_str!("../templates/uploads/controller.rs"),
+        ),
+        (
+            "src/modules/api_v2/mod.rs",
+            include_str!("../templates/api_v2/mod.rs"),
+        ),
+        (
+            "src/modules/api_v2/controller.rs",
+            include_str!("../templates/api_v2/controller.rs"),
+        ),
+        (
+            "src/modules/mod.rs",
+            "//! Application feature modules.\n\npub mod uploads;\npub mod api_v2;\n",
+        ),
         (
             "src/tests/application.rs",
             include_str!("../templates/tests/application.rs"),
@@ -396,7 +429,10 @@ pub fn new_project(
         &root.join(".xecute/architecture"),
         &format!("{}\n", architecture.name()),
     )?;
-    write(&root.join(".gitignore"), "/target/\n.env\n/logs/\n")?;
+    write(
+        &root.join(".gitignore"),
+        "/target/\n.env\n.env.*\n!.env.example\n/logs/\n/storage/\n",
+    )?;
     let mut formatted = Vec::new();
     for (path, template) in templates {
         if path.ends_with(".rs") {
@@ -630,7 +666,10 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
     index_content.push_str(&format!("pub mod {snake};\n"));
     let declaration = "pub mod modules;\n";
     if !main.contains("mod modules;") {
-        if let Some(index) = main.find("mod app_module;") {
+        if let Some(index) = main
+            .find("pub mod app_module;")
+            .or_else(|| main.find("mod app_module;"))
+        {
             main.insert_str(index, declaration);
         } else {
             main.push_str(&format!("\n{declaration}"));

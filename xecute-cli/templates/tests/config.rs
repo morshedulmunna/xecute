@@ -22,6 +22,12 @@ fn rejects_invalid_configuration() {
         "[server]\nbind_adress = '127.0.0.1:3000'",
         "[unknown_section]",
         "[logging]\nstdout_enabled = 1",
+        "[uploads]\nmax_files = 0",
+        "[uploads]\nstorage = 'unknown'",
+        "[uploads]\nallowed_types = ['application/*']",
+        "[uploads]\nenabled = true\ndirectory = 'public/uploads'",
+        "[uploads]\nenabled = true\nmax_file_bytes = 1048576\nmax_total_bytes = 1048576",
+        "[api]\nversioning_enabled = 'true'",
     ] {
         assert!(Config::from_config(&ConfigFile::parse(source).unwrap()).is_err(), "{source}");
     }

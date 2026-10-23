@@ -11,7 +11,7 @@ fn run() -> Result<(), String> {
     let mut args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() || matches!(args[0].as_str(), "--help" | "-h" | "help") {
         println!(
-            "Xecute — Rust modules, controllers and injectable services\n\n  xecute new <project|.> [--name <package-name>] [--mvc | --cqrs] [--runtime-path <cli/xecute>]\n  xecute update\n  xecute uninstall\n  xecute run dev [--bin <name>] [--watch <path>] [-- <app arguments>]\n  xecute generate <resource|module|controller|service> <name>\n  xecute g <res|mo|co|s> <name>\n\nNew projects use MVC by default; --cqrs selects command/query handlers. Run generate from a project created with xecute new. Resources include a GET endpoint; individual generators create standalone building blocks."
+            "Xecute — Rust modules, controllers and injectable services\n\n  xecute new <project|.> [--name <package-name>] [--mvc | --cqrs] [--runtime-path <cli/xecute>]\n  xecute update\n  xecute uninstall\n  xecute run dev [--bin <name>] [--features <list>] [--watch <path>] [-- <app arguments>]\n  xecute generate <resource|module|controller|service> <name>\n  xecute g <res|mo|co|s> <name>\n\nNew projects use MVC by default; --cqrs selects command/query handlers. Run generate from a project created with xecute new. Resources include a GET endpoint; individual generators create standalone building blocks."
         );
         return Ok(());
     }
@@ -76,7 +76,7 @@ fn run() -> Result<(), String> {
             dev::run(dev::Options::parse(&args[1..])?)
         }
         "run" => {
-            Err("usage: xecute run dev [--bin <name>] [--watch <path>] [-- <app arguments>]".into())
+            Err("usage: xecute run dev [--bin <name>] [--features <list>] [--watch <path>] [-- <app arguments>]".into())
         }
         "generate" | "g" if args.len() == 2 => generate::component(
             &env::current_dir().map_err(|e| e.to_string())?,

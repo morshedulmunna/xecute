@@ -1,6 +1,6 @@
 //! Validated server settings; invalid limits fail startup rather than disable protection.
 
-use super::{ConfigError, ConfigFile, CorsConfig, DocsConfig, LoggingConfig, StaticConfig};
+use super::{ConfigError, ConfigFile, CorsConfig, DocsConfig, LoggingConfig, StaticConfig, UploadConfig};
 use std::{net::SocketAddr, time::Duration};
 
 /// Typed, validated HTTP server configuration. Durations use monotonic clocks.
@@ -30,6 +30,10 @@ pub struct Config {
     pub static_files: StaticConfig,
     /// Validated local logging destinations and event filter.
     pub logging: LoggingConfig,
+    /// Enable explicitly registered /v1 and /v2 URL groups.
+    pub versioning_enabled: bool,
+    /// Private upload backend and streaming validation limits.
+    pub uploads: UploadConfig,
 }
 
 impl Default for Config {
@@ -47,6 +51,8 @@ impl Default for Config {
             docs: DocsConfig::default(),
             static_files: StaticConfig::default(),
             logging: LoggingConfig::default(),
+            versioning_enabled: true,
+            uploads: UploadConfig::default(),
         }
     }
 }
@@ -70,13 +76,17 @@ impl Config {
             "rate_limit.requests", "rate_limit.window_seconds", "rate_limit.max_clients",
             "cors.origins", "cors.allowed_methods", "cors.allowed_headers", "cors.exposed_headers",
             "cors.allow_credentials", "cors.max_age_seconds", "docs.enabled",
-            "logging.filter", "logging.stdout_enabled", "logging.file_dir",
+            "logging.filter", "logging.stdout_enabled", "logging.file_dir", "api.versioning_enabled",
+            "uploads.enabled", "uploads.storage", "uploads.directory", "uploads.max_files",
+            "uploads.max_file_bytes", "uploads.max_total_bytes", "uploads.allowed_types",
+            "uploads.s3.bucket", "uploads.s3.region", "uploads.s3.endpoint", "uploads.s3.prefix",
+            "uploads.s3.force_path_style", "uploads.s3.allow_http",
         ])?;
         let defaults = Self::default();
         let number = |key, default, max| file.range(key, default, 1, max);
         let bind_address = file.get_or("server.bind_address", defaults.bind_address.to_string())?
             .parse().map_err(|_| ConfigError::invalid("server.bind_address", "must be an IP address and port"))?;
-        Ok(Self {
+        let config = Self {
             bind_address,
             request_timeout: Duration::from_secs(number("server.request_timeout_seconds", 30, 3600)?),
             shutdown_grace: Duration::from_secs(number("server.shutdown_grace_seconds", 10, 300)?),
@@ -93,6 +103,10 @@ impl Config {
             docs: DocsConfig::from_config(file)?,
             static_files: StaticConfig::default(),
             logging: LoggingConfig::from_config(file)?,
-        })
+            versioning_enabled: file.get_or("api.versioning_enabled", true)?,
+            uploads: UploadConfig::from_config(file)?,
+        };
+        config.uploads.validate_location(&config)?;
+        Ok(config)
     }
 }

@@ -13,3 +13,5 @@ pub(crate) mod static_files;
 
 pub use bootstrap::run;
 pub use router::router;
+
+pub(crate) mod versions;

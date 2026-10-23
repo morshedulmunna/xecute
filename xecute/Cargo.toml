@@ -15,8 +15,15 @@ categories = ["web-programming", "rust-patterns"]
 [features]
 default = []
 testing = ["dep:tower", "dep:tokio"]
+upload = ["axum/multipart", "dep:tokio", "tokio/fs", "tokio/io-util", "tokio/rt", "dep:tempfile", "dep:infer", "dep:sha2"]
+upload-s3 = ["upload", "dep:aws-sdk-s3", "dep:aws-config"]
 
 [dependencies]
+aws-sdk-s3 = { version = "1", optional = true, default-features = false, features = ["rt-tokio", "rustls", "default-https-client"] }
+aws-config = { version = "1", optional = true, default-features = false, features = ["rt-tokio", "default-https-client"] }
+tempfile = { version = "3", optional = true }
+infer = { version = "0.22", optional = true }
+sha2 = { version = "0.11", optional = true }
 toml = "1"
 tokio = { version = "1", features = ["time"], optional = true }
 tower = { version = "0.5", features = ["util"], optional = true }
@@ -32,6 +39,6 @@ xmacros = { version = "0.1.6", path = "../xmacros" }
 workspace = true
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "sync"] }
 tower = { version = "0.5", features = ["util"] }
 serde_json = "1"

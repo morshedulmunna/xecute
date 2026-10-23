@@ -127,6 +127,7 @@ fn generate(
         let mut body_schema = quote!(None);
         let mut query_schema = quote!(None);
         let mut declared_body = None;
+        let mut multipart_body = false;
         let mut responses = Vec::new();
 
         for attribute in std::mem::take(&mut method.attrs) {
@@ -164,6 +165,15 @@ fn generate(
                         Ok(())
                     })?;
                 }
+                "multipart" => {
+                    if !matches!(attribute.meta, syn::Meta::Path(_)) || multipart_body {
+                        return Err(syn::Error::new_spanned(
+                            attribute,
+                            "use one #[multipart] annotation without arguments",
+                        ));
+                    }
+                    multipart_body = true;
+                }
                 "body" => {
                     let BodyArgs(ty) = attribute.parse_args()?;
                     body_type = quote!(Some(stringify!(#ty)));
@@ -197,7 +207,7 @@ fn generate(
         }
         method.attrs = retained;
         let Some((verb, suffix)) = route else {
-            if !route_middleware.is_empty() {
+            if !route_middleware.is_empty() || multipart_body {
                 return Err(syn::Error::new_spanned(
                     &method.sig,
                     "middleware requires an HTTP route attribute",
@@ -279,6 +289,16 @@ fn generate(
                 }
                 _ => inputs.push(quote!(#name: #ty)),
             }
+        }
+        if multipart_body {
+            if declared_body.is_some() || actual_body.is_some() {
+                return Err(syn::Error::new_spanned(
+                    &method.sig,
+                    "multipart and JSON body metadata cannot be combined",
+                ));
+            }
+            body_type = quote!(Some("multipart/form-data"));
+            body_schema = quote!(Some(::xecute::upload::multipart_schema()));
         }
         if let Some(declared) = declared_body {
             if actual_body.as_ref().map(|ty| quote!(#ty).to_string())
@@ -401,6 +421,9 @@ mod tests {
             quote! { impl Controller { #[get("")] #[middleware()] async fn get() {} } },
             quote! { impl Controller { #[middleware(auth)] async fn helper() {} #[get("")] async fn get() {} } },
             quote! { #[middleware()] impl Controller { #[get("")] async fn get() {} } },
+            quote! { impl Controller { #[post("")] #[multipart] #[body(json = Dto)] async fn post(&self, #[body] body: Dto) {} } },
+            quote! { impl Controller { #[post("")] #[multipart(unexpected)] async fn post(&self, value: Multipart) {} } },
+            quote! { impl Controller { #[multipart] async fn helper() {} #[get("")] async fn get() {} } },
         ] {
             assert!(generate(quote!("/test"), item).is_err());
         }

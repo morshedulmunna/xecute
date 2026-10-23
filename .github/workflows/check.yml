@@ -32,6 +32,6 @@ jobs:
             "$cli" new "$project" "--$architecture" --runtime-path "$GITHUB_WORKSPACE/xecute"
             cargo generate-lockfile --manifest-path "$project/Cargo.toml"
             cargo fmt --manifest-path "$project/Cargo.toml" --all -- --check
-            cargo clippy --manifest-path "$project/Cargo.toml" --all-targets --locked -- -D warnings
-            cargo test --manifest-path "$project/Cargo.toml" --locked
+            cargo clippy --manifest-path "$project/Cargo.toml" --all-targets --all-features --locked -- -D warnings
+            cargo test --manifest-path "$project/Cargo.toml" --all-features --locked
           done

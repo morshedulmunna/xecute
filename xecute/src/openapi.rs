@@ -118,7 +118,17 @@ pub fn openapi_document(
             }
         }
         if let Some(schema) = operation.body_schema {
-            entry["requestBody"] = json!({"required": true, "content": {"application/json": {"schema": normalize_schema(schema, &mut components)?}}});
+            let content_type = if operation.body_type == Some("multipart/form-data") {
+                "multipart/form-data"
+            } else {
+                "application/json"
+            };
+            let mut content = Map::new();
+            content.insert(
+                content_type.into(),
+                json!({"schema": normalize_schema(schema, &mut components)?}),
+            );
+            entry["requestBody"] = json!({"required": true, "content": content});
         }
         let path = paths.entry(operation.path).or_insert_with(|| json!({}));
         if path

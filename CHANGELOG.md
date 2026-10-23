@@ -9,6 +9,14 @@ created projects and resources.
 
 ### Added
 
+- Streaming multipart uploads with actual size/count limits, MIME signature checks,
+  private staging, generated keys, checksums, local atomic storage, optional official
+  AWS S3 storage, and handled-failure batch rollback.
+- Explicit /v1 and /v2 route groups with independently validated OpenAPI contracts,
+  version-specific Swagger pages, and generated upload/version examples.
+- Cargo feature selection through `xecute run dev --features`, plus optional S3
+  container builds and configuration in AppConfig.toml with credentials kept outside TOML.
+
 - Typed environment configuration with required/optional values, conversion, defaults,
   numeric bounds, JSON parsing, custom invariants, and redacted secret/error handling.
 - Safe runtime exception envelopes and explicit domain-error mappings retained by

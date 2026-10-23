@@ -51,6 +51,10 @@ fn new_project_is_formatted_locked_and_accepts_resources() {
         "src/modules/example/tests/http.rs",
         ".env.example",
         "AppConfig.toml",
+        "src/modules/uploads/module.rs",
+        "src/modules/api_v2/controller.rs",
+        "src/tests/versions.rs",
+        "src/tests/uploads.rs",
     ] {
         assert!(project.join(file).is_file(), "missing {file}");
     }
@@ -63,7 +67,7 @@ fn new_project_is_formatted_locked_and_accepts_resources() {
     assert!(dockerfile.contains("aarch64-unknown-linux-musl"));
     assert!(dockerfile.contains("USER 65532:65532"));
     assert!(!dockerfile.contains("curl"));
-    assert!(manifest.contains("xecute = \"0.1.7\""));
+    assert!(manifest.contains("version = \"0.1.7\""));
     assert!(!manifest.contains("path ="));
     assert!(
         Command::new(binary)
