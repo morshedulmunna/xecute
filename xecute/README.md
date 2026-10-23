@@ -44,3 +44,49 @@ such as `database: Arc<Database>`, are resolved from the container. Mark local
 state with `#[inject(default)]` to initialize it using `Default` without treating
 it as a dependency. Register the repository in the module’s `providers` list;
 the default singleton scope shares one instance across injected services.
+
+## Middleware
+
+Middleware functions accept `Request` and `Next` from `xecute::middleware` and
+return any `IntoResponse` value. Call `next.run(request).await` to continue;
+return a response directly to stop the pipeline. Register functions in request
+execution order; response processing unwinds in reverse.
+
+```rust,ignore
+use xecute::prelude::*;
+use xecute::middleware::{Request, Next, Response};
+
+async fn auth(request: Request, next: Next) -> Response {
+    // Authenticate and insert identity into request.extensions_mut() here.
+    next.run(request).await
+}
+
+#[controller("/users")]
+#[middleware(auth)]
+#[derive(Injectable)]
+struct UserController {}
+
+#[routes]
+impl UserController {
+    #[get("")]
+    #[middleware(audit)]
+    async fn list(&self) -> &'static str { "users" }
+}
+
+// Global middleware; closures can capture Arc-backed application dependencies.
+let app = Application::new(UserController::router(controller))
+    .use_middleware(request_context)
+    .use_middleware(logging)
+    .into_router();
+```
+
+Place controller `#[middleware(...)]` below `#[controller(...)]` on the struct,
+or below `#[routes]` on its impl. Route middleware belongs on a handler inside
+that impl. Multiple functions and repeated middleware attributes preserve their
+written order. Execution is app → controller struct → controller impl → route →
+extractors/validation → handler. Controller middleware applies only to matched
+controller routes; route middleware applies only to its HTTP method. App
+middleware wraps existing routes and fallback responses. Add all routes before
+building the application pipeline.
+
+These are HTTP middleware; command/query handler pipelines are separate.

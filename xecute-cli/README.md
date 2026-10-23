@@ -74,3 +74,10 @@ Generated repositories also use `#[derive(Injectable)]`. Provider-owned storage
 uses `#[inject(default)]`; dependency fields are resolved automatically. The
 feature module registers the repository as a singleton, and services inject
 it through `Arc<FeatureRepository>`.
+
+Middleware is declared with `#[middleware(auth, audit)]` below `#[controller]`
+on a controller struct, below `#[routes]` on its impl, or on an individual route
+inside that impl. Register global middleware in generated `src/middleware.rs`
+with `app.use_middleware(auth)`. Execution follows app → controller → route →
+validation → handler, with declaration order within each scope. Middleware can
+return early or call `next.run(request).await` to continue.

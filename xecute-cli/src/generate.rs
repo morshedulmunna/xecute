@@ -173,6 +173,10 @@ pub fn new_project(name: &str, runtime: Option<&Path>, architecture: Architectur
     for (path, template) in [
         ("src/main.rs", include_str!("../templates/main.rs")),
         (
+            "src/middleware.rs",
+            include_str!("../templates/middleware.rs"),
+        ),
+        (
             "src/tests/docs.rs",
             include_str!("../templates/tests/docs.rs"),
         ),
@@ -337,7 +341,7 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
     let architecture = Architecture::read(root)?;
     let cqrs = kind == "resource" && architecture == Architecture::Cqrs;
     let (snake, pascal) = names(name)?;
-    if matches!(snake.as_str(), "app_module" | "main") {
+    if matches!(snake.as_str(), "app_module" | "main" | "middleware") {
         return Err("name conflicts with application files".into());
     }
     let main_path = root.join("src/main.rs");

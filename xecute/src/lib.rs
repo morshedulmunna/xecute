@@ -14,6 +14,10 @@ use std::{
 
 pub use xmacros::*;
 
+/// HTTP middleware and application pipeline composition.
+pub mod middleware;
+pub use middleware::Application;
+
 mod http;
 mod openapi;
 pub use http::{ApiOperation, ApiResponse, HttpError, HttpStatus, ValidatedJson, ValidatedQuery};
@@ -21,7 +25,9 @@ pub use openapi::{DocumentationError, json_schema, openapi_document};
 
 /// Common controller types and macros.
 pub mod prelude {
-    pub use crate::{HttpError, HttpStatus, Injectable, controller, routes};
+    pub use crate::{
+        Application, HttpError, HttpStatus, Injectable, controller, middleware, routes,
+    };
     pub use axum::{
         Json,
         response::{IntoResponse, Response},

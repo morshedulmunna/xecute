@@ -2,6 +2,7 @@
 
 mod app_module;
 mod configs;
+mod middleware;
 mod server;
 
 #[cfg(test)]

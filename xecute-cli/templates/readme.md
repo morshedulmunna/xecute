@@ -180,3 +180,34 @@ and command/query buses are optional extensions. The initial endpoints are GET
 
 Standalone module, controller, and service generators remain available in both
 architectures; standalone services are opt-in building blocks.
+
+## Middleware
+
+Register global middleware in `src/middleware.rs`:
+
+```rust,ignore
+pub fn configure(app: xecute::Application) -> xecute::Application {
+    app.use_middleware(auth).use_middleware(audit)
+}
+```
+
+Middleware functions accept `(Request, Next)` from `xecute::middleware` and return
+an HTTP response. `next.run(request).await` continues; returning early stops the
+pipeline. Closures can capture shared application dependencies through `Arc`.
+Global middleware covers routes, health probes, documentation, and unmatched
+requests; request logging and response normalization remain outside this pipeline.
+Handle public routes explicitly in authentication policies.
+
+For controller middleware, add `#[middleware(auth, audit)]` immediately below
+`#[controller("/example")]` on its struct. For route middleware, add
+`#[middleware(check_permission)]` to a handler inside `#[routes]`.
+Middleware also works on an entire impl immediately below `#[routes]`.
+
+Request order is app → controller → route → validation → handler. Within each
+scope, middleware runs in declaration order; responses unwind in reverse.
+Controller middleware only covers matching routes, and route middleware only
+covers its own HTTP method. Keep `#[controller]` / `#[routes]` above their
+middleware annotations so the owning macros can process them.
+
+Existing projects can wrap their assembled router with
+`xecute::Application::new(router).use_middleware(auth).into_router()`.

@@ -5,6 +5,7 @@
 
 mod controller;
 mod injectable;
+mod middleware;
 mod module;
 mod routes;
 mod routes_impl;
@@ -98,7 +99,6 @@ macro_rules! marker {
     )* };
 }
 marker!(
-    middleware,
     guard,
     interceptor,
     exception,
@@ -121,4 +121,14 @@ marker!(
 #[proc_macro_derive(Injectable, attributes(inject, scope))]
 pub fn derive_injectable(item: TokenStream) -> TokenStream {
     injectable::derive(item)
+}
+
+/// Declare ordered controller or route middleware under `#[controller]` or `#[routes]`.
+#[proc_macro_attribute]
+pub fn middleware(_attribute: TokenStream, item: TokenStream) -> TokenStream {
+    let error = syn::Error::new(proc_macro2::Span::call_site(),
+        "place #[middleware(...)] below #[controller(...)] on a struct, or below #[routes] on an impl; route middleware belongs inside a #[routes] impl")
+        .into_compile_error();
+    let item: proc_macro2::TokenStream = item.into();
+    quote::quote!(#error #item).into()
 }

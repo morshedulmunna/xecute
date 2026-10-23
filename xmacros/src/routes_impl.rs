@@ -73,7 +73,8 @@ fn generate(
     attribute: proc_macro2::TokenStream,
     item: proc_macro2::TokenStream,
 ) -> syn::Result<proc_macro2::TokenStream> {
-    let prefix = if attribute.is_empty() {
+    let uses_struct_prefix = attribute.is_empty();
+    let prefix = if uses_struct_prefix {
         quote!(Self::__XECUTE_CONTROLLER_PREFIX)
     } else {
         let prefix = syn::parse2::<LitStr>(attribute)?;
@@ -92,6 +93,7 @@ fn generate(
             "routing requires a non-generic inherent impl",
         ));
     }
+    let controller_middleware = crate::middleware::take(&mut implementation.attrs)?;
     let mut routes = Vec::new();
     let mut adapters = Vec::new();
     let mut operations = Vec::new();
@@ -107,6 +109,7 @@ fn generate(
                 "method name is reserved by #[routes]",
             ));
         }
+        let route_middleware = crate::middleware::take(&mut method.attrs)?;
         let mut route = None;
         let mut retained = Vec::new();
         let mut summary = quote!("");
@@ -193,6 +196,12 @@ fn generate(
         }
         method.attrs = retained;
         let Some((verb, suffix)) = route else {
+            if !route_middleware.is_empty() {
+                return Err(syn::Error::new_spanned(
+                    &method.sig,
+                    "middleware requires an HTTP route attribute",
+                ));
+            }
             continue;
         };
         let receiver = method.sig.receiver().is_some();
@@ -319,7 +328,11 @@ fn generate(
                 path
             }
         });
-        routes.push(quote!(.route(&#path, ::axum::routing::#verb(Self::#selected_handler))));
+        let mut method_router = quote!(::axum::routing::#verb(Self::#selected_handler));
+        for function in route_middleware.iter().rev() {
+            method_router = quote!(#method_router.layer(::axum::middleware::from_fn(#function)));
+        }
+        routes.push(quote!(.route(&#path, #method_router)));
         let method_name = verb.to_string().to_uppercase();
         operations.push(quote!(::xecute::ApiOperation { method: #method_name, path: #path, summary: #summary, tag: #tag, operation_id: #operation_id, body_type: #body_type, body_schema: #body_schema, query_schema: #query_schema, responses: vec![#(#responses),*] }));
     }
@@ -330,10 +343,17 @@ fn generate(
         ));
     }
     implementation.items.extend(adapters);
+    let router = quote!(::axum::Router::new() #(#routes)* .with_state(controller));
+    let router = crate::middleware::wrap(router, &controller_middleware);
+    let router = if uses_struct_prefix {
+        quote!(Self::__xecute_controller_middleware(#router))
+    } else {
+        router
+    };
     implementation.items.push(syn::parse_quote! {
         /// Build this controller’s router and inject its shared state.
         pub fn router(controller: ::std::sync::Arc<Self>) -> ::axum::Router {
-            ::axum::Router::new() #(#routes)* .with_state(controller)
+            #router
         }
     });
     implementation.items.push(syn::parse_quote! {
@@ -341,4 +361,21 @@ fn generate(
         pub fn api_operations() -> Vec<::xecute::ApiOperation> { vec![#(#operations),*] }
     });
     Ok(quote!(#implementation))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::generate;
+    use quote::quote;
+
+    #[test]
+    fn rejects_empty_middleware_and_middleware_on_non_routes() {
+        for item in [
+            quote! { impl Controller { #[get("")] #[middleware()] async fn get() {} } },
+            quote! { impl Controller { #[middleware(auth)] async fn helper() {} #[get("")] async fn get() {} } },
+            quote! { #[middleware()] impl Controller { #[get("")] async fn get() {} } },
+        ] {
+            assert!(generate(quote!("/test"), item).is_err());
+        }
+    }
 }

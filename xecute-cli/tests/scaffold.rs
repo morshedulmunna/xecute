@@ -37,6 +37,7 @@ fn new_project_is_formatted_locked_and_accepts_resources() {
         ".github/workflows/ci.yml",
         "src/tests/server.rs",
         "src/server/docs.rs",
+        "src/middleware.rs",
         "src/configs/docs.rs",
         "src/example/module.rs",
         "src/example/controller.rs",

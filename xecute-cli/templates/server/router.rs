@@ -25,7 +25,7 @@ pub fn router(app: Router, config: &Config) -> Router {
 
     // Register probes and a fallback before layering policies over every route.
     // Requests enter the layers below in reverse order of their registration.
-    app.route("/health/live", get(health::check))
+    let app = app.route("/health/live", get(health::check))
         .route("/health/ready", get(health::check))
         .fallback(|| async { StatusCode::NOT_FOUND })
         // Bound extractor buffering and streamed request bodies.
@@ -41,7 +41,10 @@ pub fn router(app: Router, config: &Config) -> Router {
             middleware::guard,
         ))
         // Handle browser preflights before entering the resource guards.
-        .layer(cors)
+        .layer(cors);
+
+    crate::middleware::configure(xecute::Application::new(app))
+        .into_router()
         // Outermost: rejection responses and preflights also receive IDs and logs.
         .layer(axum_middleware::from_fn(middleware::observe))
 }
