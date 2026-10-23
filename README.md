@@ -290,22 +290,27 @@ my-app/
     │   ├── rate_limit.rs
     │   ├── shutdown.rs
     │   └── middleware/        # Built-in guards, logging, response handling
-    ├── example/
+    ├── modules/
     │   ├── mod.rs
-    │   ├── module.rs
-    │   ├── controller.rs
-    │   ├── service.rs
-    │   ├── dto/mod.rs
-    │   ├── entity/mod.rs
-    │   └── repository/
+    │   └── example/
     │       ├── mod.rs
-    │       └── store.rs
-    └── tests/                 # Resource and server HTTP tests
+    │       ├── module.rs
+    │       ├── controller.rs
+    │       ├── service.rs
+    │       ├── dto/mod.rs
+    │       ├── entity/mod.rs
+    │       ├── repository/
+    │       │   ├── mod.rs
+    │       │   └── store.rs
+    │       └── tests/
+    │           ├── mod.rs
+    │           └── http.rs
+    └── tests/                 # Shared server HTTP tests
 ```
 
 Feature filenames are `controller.rs`, `module.rs`, and `service.rs`; the Rust
 type names retain the feature prefix. Resource HTTP tests live in
-`src/tests/<feature>.rs`.
+`src/modules/<feature>/tests/http.rs`.
 
 ## MVC and CQRS
 
@@ -323,10 +328,10 @@ cd my-api
 xecute g resource user
 ```
 
-Its resource replaces `service.rs` with:
+Its resource uses command/query handlers and a `services/` directory:
 
 ```text
-user/
+src/modules/user/
 ├── controller.rs
 ├── module.rs
 ├── mod.rs
@@ -336,6 +341,9 @@ user/
 ├── queries/
 │   ├── mod.rs
 │   └── list.rs      # ListUserQuery + ListUserHandler
+├── services/
+│   ├── mod.rs
+│   └── user_service.rs
 ├── dto/mod.rs
 ├── entity/mod.rs
 └── repository/
@@ -344,13 +352,19 @@ user/
 ```
 
 ```text
-POST → DTO validation → Controller → CreateUserHandler → Repository write
-GET  → Controller → ListUserHandler → Repository read
+POST → DTO validation → Controller → CreateUserHandler → UserService → Repository write
+GET  → Controller → ListUserHandler → UserService → Repository read
 ```
 
 Controllers construct command/query inputs and invoke handlers through direct
-dependency injection. Both handlers share the singleton repository. There is
-no service layer in the generated CQRS resource.
+dependency injection. Both handlers inject the same singleton business service
+from `services/user_service.rs`; that service owns shared business rules and
+normalization and injects the repository. The feature module registers and exports
+the service alongside its handlers. MVC keeps its existing `service.rs` layout.
+
+The CQRS service layer is a generator update in this working tree and is not yet
+in published CLI 0.1.8. Install the local CLI to generate this layout. Existing
+CQRS features are preserved; migrate their handlers and DI registrations manually.
 
 Initial resources implement collection GET and create POST. Update, delete,
 get-by-ID, pagination, and their handlers are application extensions. CQRS does
@@ -892,3 +906,38 @@ hooks, and exception decorators, are not complete execution systems; do not rely
 on them as operational middleware or lifecycle behavior.
 
 Licensed under **Apache-2.0**.
+
+## Feature module folders
+
+All newly generated resources and standalone modules, controllers, and services
+live under `src/modules/<feature>/`. Each resource keeps its controller, DI module,
+DTOs, entities, repository, and HTTP tests together. CQRS resources also contain
+commands, queries, and shared services. `src/modules/mod.rs` declares each feature;
+`AppModule` imports and mounts it through `crate::modules::<feature>`.
+
+```text
+src/
+├── app_module.rs
+├── modules/
+│   ├── mod.rs
+│   └── user/
+│       ├── mod.rs
+│       ├── module.rs
+│       ├── controller.rs
+│       ├── commands/
+│       ├── queries/
+│       ├── services/
+│       │   ├── mod.rs
+│       │   └── user_service.rs
+│       ├── dto/
+│       ├── entity/
+│       ├── repository/
+│       └── tests/
+│           ├── mod.rs
+│           └── http.rs
+└── tests/                 # Shared server/infrastructure tests
+```
+
+MVC resources use `service.rs` inside their feature folder instead of CQRS
+commands/queries/services directories. This is a local generator update pending
+publication; existing root-level features are preserved rather than moved.

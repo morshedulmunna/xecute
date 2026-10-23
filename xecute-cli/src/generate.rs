@@ -316,8 +316,8 @@ pub fn new_project(
             ".gitignore",
             "README.md",
             "src/app_module.rs",
-            "src/example",
-            "src/tests/example.rs",
+            "src/modules/example",
+            "src/modules/mod.rs",
         ]);
         if runtime.is_none() {
             outputs.push("Cargo.lock");
@@ -410,7 +410,10 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
     let architecture = Architecture::read(root)?;
     let cqrs = kind == "resource" && architecture == Architecture::Cqrs;
     let (snake, pascal) = names(name)?;
-    if matches!(snake.as_str(), "app_module" | "main" | "middleware") {
+    if matches!(
+        snake.as_str(),
+        "app_module" | "main" | "middleware" | "modules"
+    ) {
         return Err("name conflicts with application files".into());
     }
     let main_path = root.join("src/main.rs");
@@ -418,8 +421,28 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
     let mut main =
         fs::read_to_string(&main_path).map_err(|_| "run generate from a Xecute project root")?;
     let mut app = fs::read_to_string(&app_path).map_err(|_| "missing src/app_module.rs")?;
-    let folder = root.join("src").join(&snake);
-    if folder.exists() {
+    let modules = root.join("src/modules");
+    if let Ok(metadata) = modules.symlink_metadata()
+        && (!metadata.is_dir() || metadata.file_type().is_symlink())
+    {
+        return Err("src/modules must be a real directory; no files changed".into());
+    }
+    let index = modules.join("mod.rs");
+    if index
+        .symlink_metadata()
+        .is_ok_and(|metadata| metadata.file_type().is_symlink())
+    {
+        return Err("src/modules/mod.rs must not be a symlink; no files changed".into());
+    }
+    let mut index_content = match fs::read_to_string(&index) {
+        Ok(content) => content,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            "//! Application feature modules.\n\n".into()
+        }
+        Err(error) => return Err(format!("cannot read src/modules/mod.rs: {error}")),
+    };
+    let folder = modules.join(&snake);
+    if folder.exists() || root.join("src").join(&snake).exists() {
         return Err(format!(
             "{} already exists; no files changed",
             folder.display()
@@ -488,7 +511,10 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
         app = app
             .replace(
                 markers[0],
-                &format!("use crate::{snake}::{pascal}Module;\n{}", markers[0]),
+                &format!(
+                    "use crate::modules::{snake}::{pascal}Module;\n{}",
+                    markers[0]
+                ),
             )
             .replace(markers[1], &format!("{pascal}Module,\n    {}", markers[1]))
             .replace(
@@ -497,17 +523,14 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
             );
         if kind == "resource" {
             if app.contains("// xecute:api") {
-                app = app.replace("// xecute:api", &format!("let operations = operations.into_iter().chain(crate::{snake}::{pascal}Controller::api_operations()).collect::<Vec<_>>();\n        // xecute:api"));
+                app = app.replace("// xecute:api", &format!("let operations = operations.into_iter().chain(crate::modules::{snake}::{pascal}Controller::api_operations()).collect::<Vec<_>>();\n        // xecute:api"));
             }
-            app = app.replace(markers[3], &format!("let router = router.merge(crate::{snake}::{pascal}Controller::router(container.resolve::<crate::{snake}::{pascal}Controller>()?));\n        {}", markers[3]));
+            app = app.replace(markers[3], &format!("let router = router.merge(crate::modules::{snake}::{pascal}Controller::router(container.resolve::<crate::modules::{snake}::{pascal}Controller>()?));\n        {}", markers[3]));
         }
     }
     if kind == "resource" {
         for (name, template) in [
-            (
-                "dto/mod.rs",
-                include_str!("../templates/resource/dto.rs"),
-            ),
+            ("dto/mod.rs", include_str!("../templates/resource/dto.rs")),
             (
                 "entity/mod.rs",
                 include_str!("../templates/resource/entity.rs"),
@@ -533,23 +556,42 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
                 "commands/create.rs",
                 include_str!("../templates/cqrs/create.rs"),
             ),
-            (
-                "queries/list.rs",
-                include_str!("../templates/cqrs/list.rs"),
-            ),
+            ("queries/list.rs", include_str!("../templates/cqrs/list.rs")),
         ] {
             files.push((path.into(), template.replace("__TYPE__", &pascal)));
         }
         files.push(("commands/mod.rs".into(), format!("//! Write operations.\nmod create;\npub use create::{{Create{pascal}Command, Create{pascal}Handler}};\n")));
         files.push(("queries/mod.rs".into(), format!("//! Read operations.\nmod list;\npub use list::{{List{pascal}Query, List{pascal}Handler}};\n")));
-        mods.push_str("\npub mod commands;\npub mod queries;\n");
+        files.push((
+            format!("services/{snake}_service.rs"),
+            include_str!("../templates/cqrs/service.rs").replace("__TYPE__", &pascal),
+        ));
+        files.push(("services/mod.rs".into(), format!("//! Shared business services for this feature.\nmod {snake}_service;\npub use {snake}_service::{pascal}Service;\n")));
+        mods.push_str("\npub mod commands;\npub mod queries;\npub mod services;\n");
+    }
+    if kind == "resource" {
+        files.push((
+            "tests/http.rs".into(),
+            include_str!("../templates/resource/tests.rs").replace("__FEATURE__", &snake),
+        ));
+        files.push((
+            "tests/mod.rs".into(),
+            "//! Feature HTTP integration tests.\nmod http;\n".into(),
+        ));
+        mods.push_str("\n#[cfg(test)]\nmod tests;\n");
     }
     files.push(("mod.rs".into(), mods));
-    let declaration = format!("pub mod {snake};\n");
-    if let Some(index) = main.find("mod app_module;") {
-        main.insert_str(index, &declaration);
-    } else {
-        main.push_str(&format!("\n{declaration}"));
+    if index_content.contains(&format!("mod {snake};")) {
+        return Err("module already declared in src/modules/mod.rs; no files changed".into());
+    }
+    index_content.push_str(&format!("pub mod {snake};\n"));
+    let declaration = "pub mod modules;\n";
+    if !main.contains("mod modules;") {
+        if let Some(index) = main.find("mod app_module;") {
+            main.insert_str(index, declaration);
+        } else {
+            main.push_str(&format!("\n{declaration}"));
+        }
     }
     if kind == "resource" {
         let manifest_path = root.join("Cargo.toml");
@@ -606,30 +648,23 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
             }
         }
     }
-    fs::create_dir(&folder).map_err(|e| e.to_string())?;
-    let mut formatted = vec!["src/main.rs".into(), "src/app_module.rs".into()];
+    fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
+    let mut formatted = vec![
+        "src/main.rs".into(),
+        "src/app_module.rs".into(),
+        "src/modules/mod.rs".into(),
+    ];
     for (name, content) in files {
-        formatted.push(format!("src/{snake}/{name}"));
+        formatted.push(format!("src/modules/{snake}/{name}"));
         let path = folder.join(name);
         fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
         write(&path, &content)?;
     }
+    write(&index, &index_content)?;
     write(&main_path, &main)?;
     write(&app_path, &app)?;
-    if kind == "resource" && root.join("src/tests/mod.rs").exists() {
-        let tests = root.join("src/tests/mod.rs");
-        let mut declarations = fs::read_to_string(&tests).map_err(|e| e.to_string())?;
-        declarations.push_str(&format!("\nmod {snake};\n"));
-        let path = root.join(format!("src/tests/{snake}.rs"));
-        write(
-            &path,
-            &include_str!("../templates/resource/tests.rs").replace("__FEATURE__", &snake),
-        )?;
-        write(&tests, &declarations)?;
-        formatted.extend(["src/tests/mod.rs".into(), format!("src/tests/{snake}.rs")]);
-    }
     format_files(root, &formatted)?;
-    println!("Created {kind} {pascal} in src/{snake}");
+    println!("Created {kind} {pascal} in src/modules/{snake}");
     if matches!(kind, "service" | "controller") {
         println!("Add this building block to a module's providers when ready to use it.");
     }

@@ -40,7 +40,7 @@ Commands:
 - `generate service <name>` / `g s <name>`: create a standalone injectable
   service; register it in your module manually.
 
-Names such as `user-profile` become `user_profile/` and `UserProfileModule`.
+Names such as `user-profile` become `src/modules/user_profile/` and `UserProfileModule`.
 No `#[path]` annotations are generated. Existing component folders are never
 overwritten. Run generation from the project root. Automatic registration uses
 the comments in `app_module.rs`; keep these markers when editing that file.
@@ -49,14 +49,19 @@ Generated projects use `xecute = "0.1.6"` from crates.io by default.
 Use `xecute new my-api --runtime-path /path/to/xecute/xecute` for local development.
 
 Generated CQRS resource folders contain `module.rs`, `controller.rs`,
-`commands/create.rs`, `queries/list.rs`, `dto/`, `entity/`, and `repository/`.
+`commands/create.rs`, `queries/list.rs`, `services/<feature>_service.rs`, `dto/`,
+`entity/`, and `repository/`.
 New projects use MVC with `service.rs` by default.
 Use `xecute new my-api --cqrs` to generate command/query handlers instead.
 `--mvc` also explicitly selects MVC.
 The selection is saved in `.xecute/architecture`; commit this file. Subsequent
 resource generation follows that selection. Existing projects without the file
 keep the legacy MVC layout. Invalid configuration stops generation.
-Command and query handlers use direct dependency injection and share one repository.
+Command and query handlers inject a shared singleton service from `services/`.
+The service contains business operations and injects the repository. The feature
+module registers/exports the service and its handlers. MVC retains `service.rs`.
+The CQRS services directory is implemented locally and awaits the next CLI release;
+existing features are not rewritten automatically.
 Separate databases, event sourcing, and message buses are optional. The repository is a bounded in-memory
 example; replace it with durable storage before deployment.
 
@@ -133,3 +138,38 @@ as usual. All generated destinations are checked first; existing scaffold files
 are never overwritten. Unrelated files and `.git` are preserved. Symlinked parent
 directories are rejected. Use a fresh directory or move conflicting files before
 retrying. A named destination also accepts `--name` to choose its package name.
+
+## Feature module folders
+
+All newly generated resources and standalone modules, controllers, and services
+live under `src/modules/<feature>/`. Each resource keeps its controller, DI module,
+DTOs, entities, repository, and HTTP tests together. CQRS resources also contain
+commands, queries, and shared services. `src/modules/mod.rs` declares each feature;
+`AppModule` imports and mounts it through `crate::modules::<feature>`.
+
+```text
+src/
+├── app_module.rs
+├── modules/
+│   ├── mod.rs
+│   └── user/
+│       ├── mod.rs
+│       ├── module.rs
+│       ├── controller.rs
+│       ├── commands/
+│       ├── queries/
+│       ├── services/
+│       │   ├── mod.rs
+│       │   └── user_service.rs
+│       ├── dto/
+│       ├── entity/
+│       ├── repository/
+│       └── tests/
+│           ├── mod.rs
+│           └── http.rs
+└── tests/                 # Shared server/infrastructure tests
+```
+
+MVC resources use `service.rs` inside their feature folder instead of CQRS
+commands/queries/services directories. This is a local generator update pending
+publication; existing root-level features are preserved rather than moved.

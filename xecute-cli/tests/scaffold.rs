@@ -39,9 +39,9 @@ fn new_project_is_formatted_locked_and_accepts_resources() {
         "src/server/docs.rs",
         "src/middleware.rs",
         "src/configs/docs.rs",
-        "src/example/module.rs",
-        "src/example/controller.rs",
-        "src/tests/example.rs",
+        "src/modules/example/module.rs",
+        "src/modules/example/controller.rs",
+        "src/modules/example/tests/http.rs",
         ".env.example",
     ] {
         assert!(project.join(file).is_file(), "missing {file}");
@@ -74,23 +74,24 @@ fn new_project_is_formatted_locked_and_accepts_resources() {
             .success()
     );
     for file in [
-        "src/user/module.rs",
-        "src/user/dto/mod.rs",
-        "src/user/entity/mod.rs",
-        "src/user/repository/store.rs",
-        "src/tests/user.rs",
+        "src/modules/user/module.rs",
+        "src/modules/user/dto/mod.rs",
+        "src/modules/user/entity/mod.rs",
+        "src/modules/user/repository/store.rs",
+        "src/modules/user/tests/http.rs",
     ] {
         assert!(project.join(file).is_file(), "missing {file}");
     }
-    assert!(!project.join("src/user/user_module.rs").exists());
-    let repository = fs::read_to_string(project.join("src/user/repository/store.rs")).unwrap();
+    assert!(!project.join("src/modules/user/user_module.rs").exists());
+    let repository =
+        fs::read_to_string(project.join("src/modules/user/repository/store.rs")).unwrap();
     assert!(repository.contains("#[derive(Injectable)]"));
     assert!(repository.contains("#[inject(default)]"));
     assert!(!repository.contains("impl Provider"));
     assert!(!repository.contains("impl Injectable"));
-    let module = fs::read_to_string(project.join("src/user/module.rs")).unwrap();
+    let module = fs::read_to_string(project.join("src/modules/user/module.rs")).unwrap();
     assert!(module.contains("#[module(\n    providers = [UserRepository, UserService, UserController],\n    controllers = [UserController],\n    exports = [UserService],\n)]"));
-    let controller = fs::read_to_string(project.join("src/user/controller.rs")).unwrap();
+    let controller = fs::read_to_string(project.join("src/modules/user/controller.rs")).unwrap();
     assert!(controller.contains("#[controller(\"/user\")]"));
     assert!(controller.contains("#[derive(Injectable)]"));
     assert!(controller.contains("#[routes]"));
@@ -99,7 +100,12 @@ fn new_project_is_formatted_locked_and_accepts_resources() {
     assert!(!controller.contains("#[xecute::"));
     assert!(manifest.contains("missing_docs = \"warn\""));
     let main = fs::read_to_string(project.join("src/main.rs")).unwrap();
-    assert!(main.contains("pub mod user;"));
+    assert!(main.contains("pub mod modules;"));
+    assert!(
+        fs::read_to_string(project.join("src/modules/mod.rs"))
+            .unwrap()
+            .contains("pub mod user;")
+    );
     assert!(main.contains("server::run().await"));
     assert!(!main.contains("#[path"));
     let app = fs::read_to_string(project.join("src/app_module.rs")).unwrap();
@@ -143,8 +149,26 @@ fn architecture_selection_persists_and_invalid_flags_do_not_create_projects() {
                 .success()
         );
         for feature in ["example", "user_profile"] {
-            let feature = project.join("src").join(feature);
+            let feature = project.join("src/modules").join(feature);
             assert_eq!(feature.join("service.rs").exists(), architecture == "mvc");
+            assert_eq!(
+                feature.join("services/mod.rs").exists(),
+                architecture == "cqrs"
+            );
+            if architecture == "cqrs" {
+                let name = feature.file_name().unwrap().to_str().unwrap();
+                let service =
+                    fs::read_to_string(feature.join(format!("services/{name}_service.rs")))
+                        .unwrap();
+                assert!(service.contains("repository: Arc<"));
+                for handler in ["commands/create.rs", "queries/list.rs"] {
+                    let handler = fs::read_to_string(feature.join(handler)).unwrap();
+                    assert!(handler.contains("service: Arc<"));
+                    assert!(!handler.contains("repository: Arc<"));
+                }
+                let module = fs::read_to_string(feature.join("module.rs")).unwrap();
+                assert!(module.contains("Service,"));
+            }
             assert_eq!(
                 feature.join("commands/create.rs").exists(),
                 architecture == "cqrs"
@@ -252,7 +276,7 @@ fn initializes_current_directory_and_preflights_all_conflicts() {
         "README.md",
         "Cargo.toml",
         "src/main.rs",
-        "src/tests/example.rs",
+        "src/modules/example/tests/http.rs",
         ".github/workflows/ci.yml",
     ]
     .into_iter()
