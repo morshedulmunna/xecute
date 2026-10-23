@@ -284,5 +284,5 @@ src/
 ```
 
 MVC resources use `service.rs` inside their feature folder instead of CQRS
-commands/queries/services directories. This is a local generator update pending
-publication; existing root-level features are preserved rather than moved.
+commands/queries/services directories. This layout is available starting with
+CLI 0.1.9; existing root-level features are preserved rather than moved.

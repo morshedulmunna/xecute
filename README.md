@@ -31,7 +31,7 @@ use an injectable repository and validated request DTOs.
 
 ## Release status
 
-Published packages are `xecute-cli 0.1.8`, `xecute 0.1.6`, and `xmacros 0.1.5`.
+Published packages are `xecute-cli 0.1.9`, `xecute 0.1.6`, and `xmacros 0.1.5`.
 MVC is the default; CQRS is selected with `--cqrs`.
 
 This release includes `xecute run dev` with automatic development rebuild/restart,
@@ -51,9 +51,9 @@ Use a Rust installation with Cargo, rustfmt, and Clippy.
 Install the published CLI:
 
 ```sh
-cargo install xecute-cli --version 0.1.8 --locked
+cargo install xecute-cli --version 0.1.9 --locked
 # Update an existing installation:
-cargo install xecute-cli --version 0.1.8 --locked --force
+cargo install xecute-cli --version 0.1.9 --locked --force
 ```
 
 Create and run an MVC application:
@@ -362,9 +362,8 @@ from `services/user_service.rs`; that service owns shared business rules and
 normalization and injects the repository. The feature module registers and exports
 the service alongside its handlers. MVC keeps its existing `service.rs` layout.
 
-The CQRS service layer is a generator update in this working tree and is not yet
-in published CLI 0.1.8. Install the local CLI to generate this layout. Existing
-CQRS features are preserved; migrate their handlers and DI registrations manually.
+The CQRS service layer is available starting with CLI 0.1.9. Existing CQRS
+features are preserved; migrate their handlers and DI registrations manually.
 
 Initial resources implement collection GET and create POST. Update, delete,
 get-by-ID, pagination, and their handlers are application extensions. CQRS does
@@ -939,5 +938,5 @@ src/
 ```
 
 MVC resources use `service.rs` inside their feature folder instead of CQRS
-commands/queries/services directories. This is a local generator update pending
-publication; existing root-level features are preserved rather than moved.
+commands/queries/services directories. This layout is available starting with
+CLI 0.1.9; existing root-level features are preserved rather than moved.

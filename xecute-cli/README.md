@@ -60,8 +60,8 @@ keep the legacy MVC layout. Invalid configuration stops generation.
 Command and query handlers inject a shared singleton service from `services/`.
 The service contains business operations and injects the repository. The feature
 module registers/exports the service and its handlers. MVC retains `service.rs`.
-The CQRS services directory is implemented locally and awaits the next CLI release;
-existing features are not rewritten automatically.
+The CQRS services directory is available starting with CLI 0.1.9; existing
+features are not rewritten automatically.
 Separate databases, event sourcing, and message buses are optional. The repository is a bounded in-memory
 example; replace it with durable storage before deployment.
 
@@ -171,5 +171,5 @@ src/
 ```
 
 MVC resources use `service.rs` inside their feature folder instead of CQRS
-commands/queries/services directories. This is a local generator update pending
-publication; existing root-level features are preserved rather than moved.
+commands/queries/services directories. This layout is available starting with
+CLI 0.1.9; existing root-level features are preserved rather than moved.
