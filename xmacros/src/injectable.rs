@@ -15,11 +15,12 @@ pub fn derive(item: TokenStream) -> TokenStream {
 fn expand_inner(item: TokenStream, include_structure: bool) -> TokenStream {
     let mut structure = parse_macro_input!(item as ItemStruct);
     let name = structure.ident.clone();
-    let scope = match structure
-        .attrs
-        .iter()
-        .find(|attr| attr.path().is_ident("scope"))
-    {
+    let scope = match structure.attrs.iter().find(|attr| {
+        attr.path()
+            .segments
+            .last()
+            .is_some_and(|segment| segment.ident == "scope")
+    }) {
         Some(attribute) => match attribute.parse_args::<LitStr>() {
             Ok(value) => match value.value().as_str() {
                 "singleton" => quote!(::xecute::Scope::Singleton),
@@ -38,9 +39,13 @@ fn expand_inner(item: TokenStream, include_structure: bool) -> TokenStream {
         },
         None => quote!(::xecute::Scope::Singleton),
     };
-    structure
-        .attrs
-        .retain(|attribute| !attribute.path().is_ident("scope"));
+    structure.attrs.retain(|attribute| {
+        !attribute
+            .path()
+            .segments
+            .last()
+            .is_some_and(|segment| segment.ident == "scope")
+    });
     let (legacy_fields, container_fields, dependencies) = {
         let Fields::Named(fields) = &mut structure.fields else {
             return syn::Error::new_spanned(&structure, "#[injectable] requires named fields")
@@ -120,6 +125,15 @@ fn expand_inner(item: TokenStream, include_structure: bool) -> TokenStream {
         (legacy_fields, container_fields, dependencies)
     };
 
+    let optional_dependencies = match &structure.fields {
+        Fields::Named(fields) => fields
+            .named
+            .iter()
+            .filter(|field| is_wrapper(&field.ty, "Option"))
+            .map(|field| inner_dependency_type(&field.ty))
+            .collect::<Vec<_>>(),
+        _ => Vec::new(),
+    };
     let declaration = include_structure.then_some(&structure);
 
     quote! {
@@ -133,6 +147,9 @@ fn expand_inner(item: TokenStream, include_structure: bool) -> TokenStream {
             fn scope() -> ::xecute::Scope { #scope }
             fn dependencies() -> Vec<::xecute::ProviderKey> {
                 vec![#(::xecute::ProviderKey::of::<#dependencies>()),*]
+            }
+            fn optional_dependencies() -> Vec<::xecute::ProviderKey> {
+                vec![#(::xecute::ProviderKey::of::<#optional_dependencies>()),*]
             }
             fn provide(container: &::xecute::Container) -> Result<Self, ::xecute::InjectError> {
                 Ok(Self { #(#container_fields),* })

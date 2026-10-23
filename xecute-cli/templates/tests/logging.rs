@@ -101,14 +101,15 @@ fn file_output_flushes_and_accepts_an_additional_exporter_layer() {
     if std::env::var_os("XECUTE_FILE_LOG_TEST_CHILD").is_none() {
         let directory = std::env::temp_dir().join(format!("xecute-log-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&directory).unwrap();
+        let log_dir = directory.join("logs");
+        let config_path = directory.join("AppConfig.toml");
+        std::fs::write(&config_path, format!("[logging]\nstdout_enabled = false\nfile_dir = {}\n", serde_json::to_string(&log_dir.to_string_lossy()).unwrap())).unwrap();
         let module = module_path!().split_once("::").unwrap().1;
         let status = std::process::Command::new(std::env::current_exe().unwrap())
             .args(["--exact", &format!("{module}::file_output_flushes_and_accepts_an_additional_exporter_layer"), "--test-threads=1"])
-            .env("XECUTE_FILE_LOG_TEST_CHILD", "1").env("RUST_LOG", "info")
-            .env("LOG_STDOUT_ENABLED", "false")
-            .env("LOG_FILE_DIR", &directory).status().unwrap();
+            .env("XECUTE_FILE_LOG_TEST_CHILD", &config_path).status().unwrap();
         assert!(status.success());
-        let path = std::fs::read_dir(&directory).unwrap().next().unwrap().unwrap().path();
+        let path = std::fs::read_dir(&log_dir).unwrap().next().unwrap().unwrap().path();
         let content = std::fs::read_to_string(path).unwrap();
         let events: Vec<serde_json::Value> = content.lines().map(|line| serde_json::from_str(line).unwrap()).collect();
         assert_eq!(events.len(), 1);
@@ -125,29 +126,26 @@ fn file_output_flushes_and_accepts_an_additional_exporter_layer() {
         }
     }
     let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let guard = crate::server::logging::init_with_layer(&Config::default(), Exporter(count.clone())).unwrap();
+    let config = Config::from_path(std::env::var("XECUTE_FILE_LOG_TEST_CHILD").unwrap()).unwrap();
+    let guard = crate::server::logging::init_with_layer(&config, Exporter(count.clone())).unwrap();
     tracing::info!(answer = 42, "file and exporter event");
     assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 1);
     drop(guard);
 }
 
 #[test]
-fn logger_config_uses_two_settings() {
-    use crate::configs::LoggingConfig;
-    assert!(LoggingConfig::from_lookup(|_| Ok(None)).unwrap().stdout);
-    assert!(!LoggingConfig::from_lookup(|_| Ok(None)).unwrap().file_enabled);
-    assert!(!LoggingConfig::from_lookup(|key| Ok((key == "LOG_FILE_DIR").then(String::new))).unwrap().file_enabled);
-    let config = LoggingConfig::from_lookup(|key| Ok(match key {
-        "LOG_STDOUT_ENABLED" => Some("false".into()),
-        "LOG_FILE_DIR" => Some("logs".into()),
-        _ => None,
-    })).unwrap();
+fn logger_output_uses_two_settings() {
+    use crate::configs::{ConfigFile, LoggingConfig};
+    let defaults = LoggingConfig::from_config(&ConfigFile::parse("").unwrap()).unwrap();
+    assert!(defaults.stdout);
+    assert!(!defaults.file_enabled);
+    let config = LoggingConfig::from_config(&ConfigFile::parse("[logging]\nstdout_enabled = false\nfile_dir = 'logs'").unwrap()).unwrap();
     assert!(!config.stdout);
     assert!(config.file_enabled);
     assert_eq!(config.filename, "app");
     assert_eq!(config.rotation, "daily");
     assert_eq!(config.max_files, 7);
-    assert!(LoggingConfig::from_lookup(|key| Ok((key == "LOG_STDOUT_ENABLED").then(|| "invalid".into()))).is_err());
+    assert!(LoggingConfig::from_config(&ConfigFile::parse("[logging]\nstdout_enabled = 'invalid'").unwrap()).is_err());
 }
 
 #[test]
@@ -155,7 +153,8 @@ fn public_log_destinations_are_rejected_before_creating_files() {
     let root = std::env::temp_dir().join(format!("xecute-private-log-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     let config = Config { static_files: crate::configs::StaticConfig { directory: root.clone(), ..Default::default() }, ..Default::default() };
-    let logging = crate::configs::LoggingConfig::from_lookup(|key| Ok((key == "LOG_FILE_DIR").then(|| root.join("logs").to_string_lossy().into_owned()))).unwrap();
+    let source = format!("[logging]\nfile_dir = {}", serde_json::to_string(&root.join("logs").to_string_lossy()).unwrap());
+    let logging = crate::configs::LoggingConfig::from_config(&crate::configs::ConfigFile::parse(&source).unwrap()).unwrap();
     assert!(crate::server::logging::validate_output_paths(&config, &logging).is_err());
     assert!(!root.join("logs").exists());
     std::fs::remove_dir_all(root).unwrap();

@@ -1,0 +1,31 @@
+# Ordinary application settings. Keep credentials/tokens in .env or your secret store.
+# This file is required at startup and may be committed to source control.
+
+[server]
+bind_address = "127.0.0.1:3000"
+request_timeout_seconds = 30
+shutdown_grace_seconds = 10
+body_limit_bytes = 1048576
+max_in_flight_requests = 256
+
+[rate_limit]
+requests = 60
+window_seconds = 60
+max_clients = 10000
+
+[cors]
+origins = []
+allowed_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+allowed_headers = ["content-type", "authorization"]
+exposed_headers = ["x-request-id", "retry-after"]
+allow_credentials = false
+max_age_seconds = 600
+
+[docs]
+enabled = true
+
+[logging]
+filter = "info"
+stdout_enabled = true
+# A nonempty directory enables file output; use "" for console only.
+file_dir = "logs"

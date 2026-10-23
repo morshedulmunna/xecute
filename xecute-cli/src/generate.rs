@@ -179,9 +179,21 @@ pub fn new_project(
             .replace('"', "\\\"");
         format!("xecute = {{ path = \"{runtime}\" }}")
     } else {
-        "xecute = \"0.1.6\"".to_owned()
+        "xecute = \"0.1.7\"".to_owned()
+    };
+    let test_dependency = if dependency.ends_with(" }") {
+        format!(
+            "{}, features = [\"testing\"] }}",
+            dependency.trim_end_matches(" }")
+        )
+    } else {
+        "xecute = { version = \"0.1.7\", features = [\"testing\"] }".to_owned()
     };
     let templates = [
+        (
+            "src/tests/application.rs",
+            include_str!("../templates/tests/application.rs"),
+        ),
         (
             "src/tests/static_files.rs",
             include_str!("../templates/tests/static_files.rs"),
@@ -310,6 +322,10 @@ pub fn new_project(
         ),
         (".env.example", include_str!("../templates/env.example")),
         (
+            "AppConfig.toml",
+            include_str!("../templates/AppConfig.toml"),
+        ),
+        (
             "rust-toolchain.toml",
             include_str!("../templates/rust-toolchain.toml"),
         ),
@@ -372,7 +388,8 @@ pub fn new_project(
         &root.join("Cargo.toml"),
         &include_str!("../templates/Cargo.toml.in")
             .replace("__PROJECT_NAME__", name)
-            .replace("__RUNTIME_DEPENDENCY__", &dependency),
+            .replace("__RUNTIME_DEPENDENCY__", &dependency)
+            .replace("__RUNTIME_TEST_DEPENDENCY__", &test_dependency),
     )?;
     fs::create_dir(root.join(".xecute")).map_err(|e| e.to_string())?;
     write(
@@ -546,7 +563,12 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
             if app.contains("// xecute:api") {
                 app = app.replace("// xecute:api", &format!("let operations = operations.into_iter().chain(crate::modules::{snake}::{pascal}Controller::api_operations()).collect::<Vec<_>>();\n        // xecute:api"));
             }
-            app = app.replace(markers[3], &format!("let router = router.merge(crate::modules::{snake}::{pascal}Controller::router(container.resolve::<crate::modules::{snake}::{pascal}Controller>()?));\n        {}", markers[3]));
+            let controller_container = if app.contains("fn router_with_container(") {
+                "container.clone()"
+            } else {
+                "::std::sync::Arc::new(container.clone())"
+            };
+            app = app.replace(markers[3], &format!("let router = router.merge(crate::modules::{snake}::{pascal}Controller::scoped_router({controller_container}));\n        {}", markers[3]));
         }
     }
     if kind == "resource" {
@@ -617,52 +639,8 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
     if kind == "resource" {
         let manifest_path = root.join("Cargo.toml");
         if manifest_path.exists() {
-            let mut manifest = fs::read_to_string(&manifest_path).map_err(|e| e.to_string())?;
-            let before = manifest.clone();
-            for (dependency, declaration) in [
-                (
-                    "validator",
-                    "validator = { version = \"0.20\", features = [\"derive\"] }",
-                ),
-                ("schemars", "schemars = \"1.2\""),
-            ] {
-                let present = manifest.lines().any(|line| {
-                    line.split_once('=')
-                        .is_some_and(|(key, _)| key.trim() == dependency)
-                        || line.trim() == format!("[dependencies.{dependency}]")
-                });
-                if !present {
-                    if !manifest.contains("[dependencies]") {
-                        return Err("Cargo.toml is missing [dependencies]".into());
-                    }
-                    manifest = manifest.replacen(
-                        "[dependencies]",
-                        &format!("[dependencies]\n{declaration}"),
-                        1,
-                    );
-                }
-            }
-            // Upgrade the standard registry dependency emitted by previous CLI releases.
-            manifest = manifest
-                .lines()
-                .map(|line| {
-                    if line
-                        .split_once('=')
-                        .is_some_and(|(key, _)| key.trim() == "xecute")
-                    {
-                        line.replace("\"0.1.0\"", "\"0.1.6\"")
-                            .replace("\"0.1.1\"", "\"0.1.6\"")
-                            .replace("\"0.1.2\"", "\"0.1.6\"")
-                            .replace("\"0.1.3\"", "\"0.1.6\"")
-                            .replace("\"0.1.4\"", "\"0.1.6\"")
-                            .replace("\"0.1.5\"", "\"0.1.6\"")
-                    } else {
-                        line.to_owned()
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join("\n")
-                + "\n";
+            let before = fs::read_to_string(&manifest_path).map_err(|e| e.to_string())?;
+            let manifest = crate::manifest::resource_dependencies(&before)?;
             if before != manifest {
                 write(&manifest_path, &manifest)?;
                 println!("Updated resource dependencies; cargo build will refresh Cargo.lock.");
@@ -717,7 +695,7 @@ mod tests {
         .unwrap();
         component(&root, "res", "user").unwrap();
         let before = fs::read_to_string(root.join("src/app_module.rs")).unwrap();
-        assert!(before.contains("UserController::router"));
+        assert!(before.contains("UserController::scoped_router"));
         assert!(component(&root, "res", "user").is_err());
         assert_eq!(
             before,

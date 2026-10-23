@@ -1,6 +1,6 @@
 [package]
 name = "xmacros"
-version = "0.1.5"
+version = "0.1.6"
 edition.workspace = true
 rust-version.workspace = true
 description = "Dependency-injection and Axum route macros for Xecute applications"

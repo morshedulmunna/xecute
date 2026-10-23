@@ -1,7 +1,7 @@
 //! Application entrypoint; the server module owns startup and shutdown.
 
 mod app_module;
-mod configs;
+pub mod configs;
 mod middleware;
 mod server;
 

@@ -12,16 +12,47 @@ use validator::Validate;
 /// HTTP status codes usable by controllers without importing Axum internals.
 pub type HttpStatus = StatusCode;
 
-/// Safe HTTP failure. Generated server middleware adds the standard error envelope.
+/// Safe HTTP failure with a JSON envelope; request boundaries add correlation IDs.
 #[derive(Debug, Clone, Copy)]
 pub struct HttpError {
     status: StatusCode,
+    public: Option<(&'static str, &'static str)>,
 }
 
 impl HttpError {
-    /// Construct a failure from its public status code.
+    /// Construct a failure from its public status code; non-error statuses become 500.
     pub const fn new(status: StatusCode) -> Self {
-        Self { status }
+        let status = if status.as_u16() >= 400 && status.as_u16() <= 599 {
+            status
+        } else {
+            StatusCode::INTERNAL_SERVER_ERROR
+        };
+        Self {
+            status,
+            public: None,
+        }
+    }
+
+    /// Map an expected domain failure to explicit public 4xx details.
+    /// Codes must contain only lowercase ASCII letters, digits, or underscores.
+    /// 5xx failures always keep the default safe details, even when custom text is supplied.
+    pub fn public(status: StatusCode, code: &'static str, message: &'static str) -> Self {
+        let mut error = Self::new(status);
+        if status.is_client_error()
+            && !code.is_empty()
+            && code.len() <= 64
+            && code
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+        {
+            error.public = Some((code, message));
+        }
+        error
+    }
+    /// Return safe response details; never serialize an internal error's Display text.
+    pub fn public_details(self) -> (&'static str, &'static str) {
+        self.public
+            .unwrap_or_else(|| crate::exceptions::default_error(self.status))
     }
 
     /// Return the response status without revealing submitted payload values.
@@ -46,7 +77,7 @@ impl std::error::Error for HttpError {}
 
 impl IntoResponse for HttpError {
     fn into_response(self) -> Response {
-        self.status.into_response()
+        crate::exceptions::error_response(self, "")
     }
 }
 

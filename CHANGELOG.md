@@ -7,6 +7,29 @@ created projects and resources.
 
 ## [Unreleased]
 
+### Added
+
+- Typed environment configuration with required/optional values, conversion, defaults,
+  numeric bounds, JSON parsing, custom invariants, and redacted secret/error handling.
+- Safe runtime exception envelopes and explicit domain-error mappings retained by
+  generated middleware, with request correlation and protected internal failures.
+- Automatic per-request DI contexts and controller routing; nested request/transient
+  resolution, concurrent singleton caching, eager startup initialization, and graph validation.
+- Optional testing helpers: isolated module/provider overrides, in-process HTTP client,
+  JSON assertions, response size bounds, timeouts, and generated usage examples.
+
+### Changed
+
+- Ordinary generated application settings now load from required AppConfig.toml;
+  .env is optional and contains only secret examples. TOML types/unknown keys are
+  validated at startup, and the same snapshot configures server and logging.
+
+- Generated applications use runtime 0.1.7 and macros 0.1.6 APIs. These package
+  versions are prepared locally until the next release; use `--runtime-path` for local validation.
+- Provider construction errors are cached per scope; undeclared factory dependencies
+  and missing required registrations now fail explicitly.
+
+
 ### Fixed
 
 - Serve a generated static landing page at both `/static` and `/static/`.

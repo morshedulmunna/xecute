@@ -14,15 +14,8 @@ impl Default for DocsConfig {
 }
 
 impl DocsConfig {
-    /// Parse a strict boolean without changing the process environment.
-    pub(crate) fn from_lookup(
-        lookup: &impl Fn(&str) -> Result<Option<String>, String>,
-    ) -> Result<Self, String> {
-        let enabled = match lookup("SWAGGER_ENABLED")?.as_deref() {
-            None | Some("true") => true,
-            Some("false") => false,
-            Some(_) => return Err("SWAGGER_ENABLED must be true or false".into()),
-        };
-        Ok(Self { enabled })
+    /// Read documentation exposure from the ordinary configuration snapshot.
+    pub(crate) fn from_config(file: &super::ConfigFile) -> Result<Self, super::ConfigError> {
+        Ok(Self { enabled: file.get_or("docs.enabled", true)? })
     }
 }

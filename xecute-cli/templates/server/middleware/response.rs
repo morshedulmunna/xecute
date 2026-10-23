@@ -2,22 +2,13 @@
 
 use crate::server::error;
 use axum::{
-    http::{HeaderValue, header},
+    http::HeaderValue,
     response::Response,
 };
 
 /// Keep protocol headers while replacing errors with safe JSON and adding security headers.
 pub(super) fn finalize(response: &mut Response, id: &str) {
-    // Normalize framework errors while retaining protocol/CORS/retry headers.
-    if response.status().is_client_error() || response.status().is_server_error() {
-        let normalized = error::response(response.status(), id);
-        *response.body_mut() = normalized.into_body();
-        response.headers_mut().remove(header::CONTENT_LENGTH);
-        response.headers_mut().insert(
-            header::CONTENT_TYPE,
-            HeaderValue::from_static("application/json"),
-        );
-    }
+    error::normalize_error(response, id);
     response
         .headers_mut()
         .insert("x-request-id", id.parse().unwrap());

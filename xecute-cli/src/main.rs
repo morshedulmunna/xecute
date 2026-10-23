@@ -3,6 +3,7 @@
 mod dev;
 mod generate;
 mod manage;
+mod manifest;
 
 use std::{env, path::PathBuf};
 

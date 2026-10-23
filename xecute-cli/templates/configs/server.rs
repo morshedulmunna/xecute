@@ -1,6 +1,6 @@
 //! Validated server settings; invalid limits fail startup rather than disable protection.
 
-use super::{CorsConfig, DocsConfig, StaticConfig};
+use super::{ConfigError, ConfigFile, CorsConfig, DocsConfig, LoggingConfig, StaticConfig};
 use std::{net::SocketAddr, time::Duration};
 
 /// Typed, validated HTTP server configuration. Durations use monotonic clocks.
@@ -22,12 +22,14 @@ pub struct Config {
     pub rate_limit_window: Duration,
     /// Memory bound on tracked peer IPs; active counters are not evicted.
     pub rate_limit_max_clients: usize,
-    /// Browser cross-origin policy validated from environment JSON arrays.
+    /// Browser cross-origin policy validated from TOML arrays.
     pub cors: CorsConfig,
     /// Whether API documentation is exposed.
     pub docs: DocsConfig,
     /// Dedicated public asset directory and mount prefix.
     pub static_files: StaticConfig,
+    /// Validated local logging destinations and event filter.
+    pub logging: LoggingConfig,
 }
 
 impl Default for Config {
@@ -44,57 +46,53 @@ impl Default for Config {
             cors: CorsConfig::default(),
             docs: DocsConfig::default(),
             static_files: StaticConfig::default(),
+            logging: LoggingConfig::default(),
         }
     }
 }
 
 impl Config {
-    /// Read process settings, supply safe defaults, and reject invalid values.
-    pub fn from_env() -> Result<Self, String> {
-        Self::from_lookup(super::read_env)
+    /// Read ordinary settings from the required AppConfig.toml in the working directory.
+    pub fn from_file() -> Result<Self, ConfigError> {
+        Self::from_path("AppConfig.toml")
     }
 
-    /// Accept an injectable source so tests can validate settings without mutating process state.
-    pub(crate) fn from_lookup(
-        lookup: impl Fn(&str) -> Result<Option<String>, String>,
-    ) -> Result<Self, String> {
+    /// Load an explicitly selected configuration file, without environment overrides.
+    pub fn from_path(path: impl AsRef<std::path::Path>) -> Result<Self, ConfigError> {
+        Self::from_config(&ConfigFile::load(path)?)
+    }
+
+    /// Validate a parsed snapshot before constructing policies or opening a listener.
+    pub(crate) fn from_config(file: &ConfigFile) -> Result<Self, ConfigError> {
+        file.check_keys(&[
+            "server.bind_address", "server.request_timeout_seconds", "server.shutdown_grace_seconds",
+            "server.body_limit_bytes", "server.max_in_flight_requests",
+            "rate_limit.requests", "rate_limit.window_seconds", "rate_limit.max_clients",
+            "cors.origins", "cors.allowed_methods", "cors.allowed_headers", "cors.exposed_headers",
+            "cors.allow_credentials", "cors.max_age_seconds", "docs.enabled",
+            "logging.filter", "logging.stdout_enabled", "logging.file_dir",
+        ])?;
         let defaults = Self::default();
-        let number = |key: &str, default: u64, max: u64| -> Result<u64, String> {
-            let value = match lookup(key)? {
-                None => default,
-                Some(value) => value
-                    .parse()
-                    .map_err(|_| format!("{key} must be a positive integer"))?,
-            };
-            if value == 0 || value > max {
-                return Err(format!("{key} must be between 1 and {max}"));
-            }
-            Ok(value)
-        };
-        let bind_address = lookup("BIND_ADDRESS")?
-            .map(|value| {
-                value
-                    .parse::<SocketAddr>()
-                    .map_err(|_| "BIND_ADDRESS must be an IP address and port".to_string())
-            })
-            .transpose()?
-            .unwrap_or(defaults.bind_address);
+        let number = |key, default, max| file.range(key, default, 1, max);
+        let bind_address = file.get_or("server.bind_address", defaults.bind_address.to_string())?
+            .parse().map_err(|_| ConfigError::invalid("server.bind_address", "must be an IP address and port"))?;
         Ok(Self {
             bind_address,
-            request_timeout: Duration::from_secs(number("REQUEST_TIMEOUT_SECONDS", 30, 3600)?),
-            shutdown_grace: Duration::from_secs(number("SHUTDOWN_GRACE_SECONDS", 10, 300)?),
+            request_timeout: Duration::from_secs(number("server.request_timeout_seconds", 30, 3600)?),
+            shutdown_grace: Duration::from_secs(number("server.shutdown_grace_seconds", 10, 300)?),
             body_limit: number(
-                "BODY_LIMIT_BYTES",
+                "server.body_limit_bytes",
                 defaults.body_limit as u64,
                 1_073_741_824,
             )? as usize,
-            max_in_flight: number("MAX_IN_FLIGHT_REQUESTS", 256, 100_000)? as usize,
-            rate_limit_requests: number("RATE_LIMIT_REQUESTS", 60, u32::MAX as u64)? as u32,
-            rate_limit_window: Duration::from_secs(number("RATE_LIMIT_WINDOW_SECONDS", 60, 86400)?),
-            rate_limit_max_clients: number("RATE_LIMIT_MAX_CLIENTS", 10_000, 1_000_000)? as usize,
-            cors: CorsConfig::from_lookup(&lookup)?,
-            docs: DocsConfig::from_lookup(&lookup)?,
+            max_in_flight: number("server.max_in_flight_requests", 256, 100_000)? as usize,
+            rate_limit_requests: number("rate_limit.requests", 60, u32::MAX as u64)? as u32,
+            rate_limit_window: Duration::from_secs(number("rate_limit.window_seconds", 60, 86400)?),
+            rate_limit_max_clients: number("rate_limit.max_clients", 10_000, 1_000_000)? as usize,
+            cors: CorsConfig::from_config(file)?,
+            docs: DocsConfig::from_config(file)?,
             static_files: StaticConfig::default(),
+            logging: LoggingConfig::from_config(file)?,
         })
     }
 }

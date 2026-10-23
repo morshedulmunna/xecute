@@ -26,6 +26,7 @@ uuid = { version = "1", features = ["v4"] }
 tower-http = { version = "0.6", features = ["catch-panic", "cors", "limit", "fs"] }
 
 [dev-dependencies]
+__RUNTIME_TEST_DEPENDENCY__
 utoipa = "5"
 tower = { version = "0.5", features = ["util"] }
 

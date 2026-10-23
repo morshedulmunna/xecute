@@ -16,6 +16,12 @@ pub struct __TYPE__Repository {
 #[derive(Debug)]
 pub struct CapacityExceeded;
 
+impl From<CapacityExceeded> for HttpError {
+    fn from(_: CapacityExceeded) -> Self {
+        HttpError::new(HttpStatus::SERVICE_UNAVAILABLE)
+    }
+}
+
 impl __TYPE__Repository {
     /// Read a snapshot without holding the lock while serializing a response.
     pub async fn list(&self) -> Vec<__TYPE__> {

@@ -10,9 +10,7 @@ use axum::{
 use std::time::Instant;
 use tracing::Instrument;
 
-/// Server-generated correlation ID available through request extensions.
-#[derive(Clone)]
-pub(super) struct RequestId(pub(super) String);
+use xecute::exceptions::RequestId;
 
 /// Finalize the response and emit only completion metadata, never request payloads.
 pub(crate) async fn observe(mut request: Request, next: Next) -> Response {
@@ -31,6 +29,7 @@ pub(crate) async fn observe(mut request: Request, next: Next) -> Response {
         let started = Instant::now();
         let mut response = next.run(request).await;
         super::response::finalize(&mut response, &id);
+        if method == axum::http::Method::HEAD { *response.body_mut() = axum::body::Body::empty(); }
         let status = response.status().as_u16();
         let duration_ms = started.elapsed().as_secs_f64() * 1000.0;
         let response_bytes = response.body().size_hint().exact();

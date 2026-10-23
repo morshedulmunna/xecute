@@ -1,7 +1,7 @@
 //! Per-peer quotas, global handler concurrency, and request deadlines.
 //! Limits cover handler work through response headers, not streaming body completion.
 
-use super::request_log::RequestId;
+use xecute::exceptions::RequestId;
 use crate::{
     configs::Config,
     server::{error, rate_limit::RateLimiter},

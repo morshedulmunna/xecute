@@ -95,6 +95,7 @@ fn generate(
     }
     let controller_middleware = crate::middleware::take(&mut implementation.attrs)?;
     let mut routes = Vec::new();
+    let mut scoped_routes = Vec::new();
     let mut adapters = Vec::new();
     let mut operations = Vec::new();
 
@@ -102,7 +103,7 @@ fn generate(
         let ImplItem::Fn(method) = item else { continue };
         if matches!(
             method.sig.ident.to_string().as_str(),
-            "router" | "api_operations"
+            "router" | "scoped_router" | "api_operations"
         ) {
             return Err(syn::Error::new_spanned(
                 &method.sig,
@@ -292,6 +293,7 @@ fn generate(
             body_type = quote!(Some(stringify!(#ty)));
             body_schema = quote!(Some(::xecute::json_schema::<#ty>()));
         }
+        let mut scoped_handler = handler.clone();
         let selected_handler = if receiver || has_markers {
             if method.sig.asyncness.is_none() || !method.sig.generics.params.is_empty() {
                 return Err(syn::Error::new_spanned(
@@ -309,6 +311,13 @@ fn generate(
             } else {
                 quote!(Self::#handler(#(#calls),*).await)
             };
+            scoped_handler = format_ident!("__xecute_scoped_handler_{}", handler);
+            adapters.push(syn::parse2::<ImplItem>(quote! {
+                async fn #scoped_handler(
+                    ::xecute::Inject(controller): ::xecute::Inject<Self>,
+                    #(#inputs),*
+                ) #output { #invocation }
+            })?);
             adapters.push(syn::parse2::<ImplItem>(quote! {
                 async fn #adapter(
                     ::axum::extract::State(controller): ::axum::extract::State<::std::sync::Arc<Self>>,
@@ -328,11 +337,15 @@ fn generate(
                 path
             }
         });
+        let mut scoped_method_router = quote!(::axum::routing::#verb(Self::#scoped_handler));
         let mut method_router = quote!(::axum::routing::#verb(Self::#selected_handler));
         for function in route_middleware.iter().rev() {
             method_router = quote!(#method_router.layer(::axum::middleware::from_fn(#function)));
+            scoped_method_router =
+                quote!(#scoped_method_router.layer(::axum::middleware::from_fn(#function)));
         }
         routes.push(quote!(.route(&#path, #method_router)));
+        scoped_routes.push(quote!(.route(&#path, #scoped_method_router)));
         let method_name = verb.to_string().to_uppercase();
         operations.push(quote!(::xecute::ApiOperation { method: #method_name, path: #path, summary: #summary, tag: #tag, operation_id: #operation_id, body_type: #body_type, body_schema: #body_schema, query_schema: #query_schema, responses: vec![#(#responses),*] }));
     }
@@ -354,6 +367,20 @@ fn generate(
         /// Build this controller’s router and inject its shared state.
         pub fn router(controller: ::std::sync::Arc<Self>) -> ::axum::Router {
             #router
+        }
+    });
+    let scoped_router = quote!(::axum::Router::new() #(#scoped_routes)*);
+    let scoped_router = crate::middleware::wrap(scoped_router, &controller_middleware);
+    let scoped_router = if uses_struct_prefix {
+        quote!(Self::__xecute_controller_middleware(#scoped_router))
+    } else {
+        scoped_router
+    };
+    implementation.items.push(syn::parse_quote! {
+        /// Resolve the controller for each request, respecting all dependency scopes.
+        /// Register the controller as a provider before calling this method.
+        pub fn scoped_router(container: ::std::sync::Arc<::xecute::Container>) -> ::axum::Router {
+            ::xecute::with_container(#scoped_router, container)
         }
     });
     implementation.items.push(syn::parse_quote! {

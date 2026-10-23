@@ -1,5 +1,6 @@
-//! Browser cross-origin policy parsed from JSON arrays in environment variables.
+//! Browser cross-origin policy parsed from typed arrays in AppConfig.toml.
 
+use super::{ConfigError, ConfigFile};
 use axum::http::{HeaderName, HeaderValue, Method, Uri};
 use std::time::Duration;
 
@@ -49,26 +50,18 @@ impl Default for CorsConfig {
 
 impl CorsConfig {
     /// Validate list shapes and protocol values before any middleware is constructed.
-    pub(crate) fn from_lookup(
-        lookup: &impl Fn(&str) -> Result<Option<String>, String>,
-    ) -> Result<Self, String> {
-        let strings = |key: &str, default: &str| -> Result<Vec<String>, String> {
-            let raw = lookup(key)?.unwrap_or_else(|| default.to_owned());
-            let values: Vec<String> = serde_json::from_str(&raw)
-                .map_err(|_| format!("{key} must be a JSON array of strings"))?;
-            if values
-                .iter()
-                .any(|value| value.is_empty() || value.trim() != value || value == "*")
-            {
-                return Err(format!(
-                    "{key} entries must be nonempty exact values without wildcards or surrounding whitespace"
-                ));
+    pub(crate) fn from_config(file: &ConfigFile) -> Result<Self, ConfigError> {
+        let strings = |key: &str, default: &str| -> Result<Vec<String>, ConfigError> {
+            let defaults: Vec<String> = serde_json::from_str(default).expect("valid built-in CORS list");
+            let values: Vec<String> = file.get_or(key, defaults)?;
+            if values.iter().any(|value| value.is_empty() || value.trim() != value || value == "*") {
+                return Err(ConfigError::invalid(key, "entries must be nonempty exact values without wildcards or surrounding whitespace"));
             }
             Ok(values)
         };
         let mut origins = Vec::new();
-        for origin in strings("CORS_ORIGINS", "[]")? {
-            let uri: Uri = origin.parse().map_err(|_| "invalid CORS_ORIGINS entry")?;
+        for origin in strings("cors.origins", "[]")? {
+            let uri: Uri = origin.parse().map_err(|_| ConfigError::invalid("cors.origins", "invalid origin"))?;
             if !matches!(uri.scheme_str(), Some("http" | "https"))
                 || uri.authority().is_none()
                 || uri.authority().is_some_and(|a| a.as_str().contains('@'))
@@ -76,19 +69,19 @@ impl CorsConfig {
                 || uri.query().is_some()
                 || origin.ends_with('/')
             {
-                return Err("CORS_ORIGINS must contain origins such as https://example.com without paths or credentials".into());
+                return Err(ConfigError::invalid("cors.origins", "must contain HTTP(S) origins without paths or credentials"));
             }
-            origins.push(origin.parse().map_err(|_| "invalid CORS origin header")?);
+            origins.push(origin.parse().map_err(|_| ConfigError::invalid("cors.origins", "invalid origin header"))?);
         }
         let methods = strings(
-            "CORS_ALLOWED_METHODS",
+            "cors.allowed_methods",
             r#"["GET","POST","PUT","PATCH","DELETE","HEAD","OPTIONS"]"#,
         )?
         .into_iter()
         .map(|method| {
             let method: Method = method
                 .parse()
-                .map_err(|_| "invalid CORS_ALLOWED_METHODS entry")?;
+                .map_err(|_| ConfigError::invalid("cors.allowed_methods", "invalid method"))?;
             if !matches!(
                 method,
                 Method::GET
@@ -99,47 +92,34 @@ impl CorsConfig {
                     | Method::HEAD
                     | Method::OPTIONS
             ) {
-                return Err(
-                    "CORS_ALLOWED_METHODS must contain supported uppercase HTTP methods".to_owned(),
-                );
+                return Err(ConfigError::invalid("cors.allowed_methods", "must contain supported uppercase HTTP methods"));
             }
             Ok(method)
         })
-        .collect::<Result<Vec<_>, String>>()?;
-        let headers = |key: &str, default: &str| -> Result<Vec<HeaderName>, String> {
+        .collect::<Result<Vec<_>, ConfigError>>()?;
+        let headers = |key: &str, default: &str| -> Result<Vec<HeaderName>, ConfigError> {
             strings(key, default)?
                 .into_iter()
                 .map(|value| {
                     value
                         .parse()
-                        .map_err(|_| format!("{key} contains an invalid HTTP header name"))
+                        .map_err(|_| ConfigError::invalid(key, "invalid HTTP header name"))
                 })
                 .collect()
         };
-        let allow_credentials = lookup("CORS_ALLOW_CREDENTIALS")?
-            .unwrap_or_else(|| "false".into())
-            .parse::<bool>()
-            .map_err(|_| "CORS_ALLOW_CREDENTIALS must be true or false")?;
+        let allow_credentials = file.get_or("cors.allow_credentials", false)?;
         if allow_credentials && origins.is_empty() {
-            return Err(
-                "CORS_ALLOW_CREDENTIALS requires at least one explicit CORS_ORIGINS entry".into(),
-            );
+            return Err(ConfigError::invalid("cors.allow_credentials", "requires at least one explicit cors.origins entry"));
         }
-        let max_age = lookup("CORS_MAX_AGE_SECONDS")?
-            .unwrap_or_else(|| "600".into())
-            .parse::<u64>()
-            .map_err(|_| "CORS_MAX_AGE_SECONDS must be an integer from 0 to 86400")?;
-        if max_age > 86400 {
-            return Err("CORS_MAX_AGE_SECONDS must be from 0 to 86400".into());
-        }
+        let max_age = file.range("cors.max_age_seconds", 600, 0, 86400)?;
         Ok(Self {
             origins,
             methods,
             allowed_headers: headers(
-                "CORS_ALLOWED_HEADERS",
+                "cors.allowed_headers",
                 r#"["content-type","authorization"]"#,
             )?,
-            exposed_headers: headers("CORS_EXPOSE_HEADERS", r#"["x-request-id","retry-after"]"#)?,
+            exposed_headers: headers("cors.exposed_headers", r#"["x-request-id","retry-after"]"#)?,
             allow_credentials,
             max_age: Duration::from_secs(max_age),
         })

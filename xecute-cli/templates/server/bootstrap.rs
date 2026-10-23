@@ -8,9 +8,9 @@ use tokio::sync::Notify;
 /// Start the configured listener and stop accepting work on a termination signal.
 /// Active requests drain until the configured grace period expires.
 pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Load environment values before initializing logging or reading server settings.
+    // Load environment values for secrets; ordinary settings come from AppConfig.toml.
     crate::configs::load_env()?;
-    let config = Config::from_env()?;
+    let config = Config::from_file()?;
     super::static_files::validate(&config.static_files)?;
     let _logging = logging::init(&config)?;
 
@@ -30,7 +30,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tracing::info!(url = %format!("{url}/docs/"), "Swagger UI available");
         tracing::info!(url = %format!("{url}/docs/openapi.json"), "OpenAPI document available");
     } else {
-        tracing::info!("Swagger documentation disabled (SWAGGER_ENABLED=false)");
+        tracing::info!("Swagger documentation disabled (docs.enabled=false)");
     }
 
     if config.static_files.enabled {
@@ -78,7 +78,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 }
 
 // Wildcard listener addresses are not browser destinations. Keep the bound port,
-// including an OS-assigned port when BIND_ADDRESS uses port zero.
+// including an OS-assigned port when server.bind_address uses port zero.
 fn local_url(mut address: std::net::SocketAddr) -> String {
     if address.ip().is_unspecified() {
         address.set_ip(if address.is_ipv4() {

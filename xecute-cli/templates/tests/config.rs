@@ -1,27 +1,40 @@
-//! Configuration boundary tests: invalid values must fail instead of weaken limits.
+//! TOML startup validation and separation between ordinary settings and secrets.
 
-use crate::configs::Config;
+use crate::configs::{Config, ConfigFile};
+
 #[test]
 fn rejects_invalid_configuration() {
-    for (key, value) in [
-        ("RATE_LIMIT_REQUESTS", "0"),
-        ("MAX_IN_FLIGHT_REQUESTS", "bad"),
-        ("BIND_ADDRESS", "bad"),
-        ("CORS_ORIGINS", "*"),
-        ("CORS_ORIGINS", r#"["https://example.com/private"]"#),
-        ("CORS_ORIGINS", r#"["*"]"#),
-        ("CORS_ALLOWED_METHODS", r#"["get"]"#),
-        ("CORS_ALLOWED_HEADERS", r#"["bad header"]"#),
-        ("CORS_EXPOSE_HEADERS", r#"["*"]"#),
-        ("CORS_ALLOW_CREDENTIALS", "true"),
-        ("CORS_MAX_AGE_SECONDS", "86401"),
+    for source in [
+        "[rate_limit]\nrequests = 0",
+        "[server]\nmax_in_flight_requests = 'bad'",
+        "[server]\nbind_address = 'bad'",
+        "[server]\nbody_limit_bytes = -1",
+        "[server]\nrequest_timeout_seconds = '30'",
+        "[cors]\norigins = '*'",
+        "[cors]\norigins = ['https://example.com/private']",
+        "[cors]\norigins = ['*']",
+        "[cors]\nallowed_methods = ['get']",
+        "[cors]\nallowed_headers = ['bad header']",
+        "[cors]\nexposed_headers = ['*']",
+        "[cors]\nallow_credentials = true",
+        "[cors]\nmax_age_seconds = 86401",
+        "[docs]\nenabled = 'false'",
+        "[server]\nbind_adress = '127.0.0.1:3000'",
+        "[unknown_section]",
+        "[logging]\nstdout_enabled = 1",
     ] {
-        assert!(Config::from_lookup(|k| Ok((k == key).then(|| value.to_owned()))).is_err());
+        assert!(Config::from_config(&ConfigFile::parse(source).unwrap()).is_err(), "{source}");
     }
-    let config = Config::from_lookup(|k| {
-        Ok((k == "CORS_ORIGINS")
-            .then(|| r#"["https://example.com","http://localhost:5173"]"#.into()))
-    })
-    .unwrap();
+    let config = Config::from_config(&ConfigFile::parse("[cors]\norigins = ['https://example.com', 'http://localhost:5173']").unwrap()).unwrap();
     assert_eq!(config.cors.origins.len(), 2);
+}
+
+#[test]
+fn generated_file_contains_normal_settings_and_env_example_contains_only_secrets() {
+    let config = Config::from_config(&ConfigFile::parse(include_str!("../../AppConfig.toml")).unwrap()).unwrap();
+    assert_eq!(config.bind_address.to_string(), "127.0.0.1:3000");
+    assert!(config.logging.file_enabled);
+    assert!(config.docs.enabled);
+    assert!(include_str!("../../.env.example").lines().all(|line| line.trim().is_empty() || line.starts_with('#')));
+    assert!(Config::from_path("missing-AppConfig.toml").is_err());
 }

@@ -1,9 +1,11 @@
-//! Environment-driven output, rotation, and filtering settings.
+//! AppConfig.toml-driven output, rotation, and filtering settings.
 
+use super::{ConfigError, ConfigFile};
 use std::path::{Path, PathBuf};
 use tracing_subscriber::EnvFilter;
 
 /// Validated logger destinations and file retention policy.
+#[derive(Clone, Debug)]
 pub struct LoggingConfig {
     /// Global filter applied to console, file, and exporter layers.
     pub filter: EnvFilter,
@@ -20,24 +22,25 @@ pub struct LoggingConfig {
     /// Maximum matching files retained by the rolling appender.
     pub max_files: usize,
 }
-impl LoggingConfig {
-    /// Read logging configuration without changing process environment variables.
-    pub fn from_env() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        Self::from_lookup(super::read_env).map_err(Into::into)
+impl Default for LoggingConfig {
+    fn default() -> Self {
+        Self {
+            filter: EnvFilter::new("info"), stdout: true, file_enabled: false,
+            directory: "logs".into(), filename: "app".into(), rotation: "daily".into(), max_files: 7,
+        }
     }
-    pub(crate) fn from_lookup(lookup: impl Fn(&str) -> Result<Option<String>, String>) -> Result<Self, String> {
-        let boolean = |key: &str, default: bool| match lookup(key)?.as_deref() {
-            None => Ok(default), Some("true") => Ok(true), Some("false") => Ok(false),
-            _ => Err(format!("{key} must be true or false")),
-        };
-        let filter = EnvFilter::try_new(lookup("RUST_LOG")?.unwrap_or_else(|| "info".into())).map_err(|e| e.to_string())?;
-        let file_directory = lookup("LOG_FILE_DIR")?;
-        let file_enabled = file_directory.as_ref().is_some_and(|value| !value.trim().is_empty());
-        let directory = file_directory.filter(|value| !value.trim().is_empty()).unwrap_or_else(|| "logs".into());
-        let filename = "app".to_owned();
-        let rotation = "daily".to_owned();
-        let max_files = 7;
-        Ok(Self { filter, stdout: boolean("LOG_STDOUT_ENABLED", true)?, file_enabled, directory: directory.into(), filename, rotation, max_files })
+}
+impl LoggingConfig {
+    pub(crate) fn from_config(file: &ConfigFile) -> Result<Self, ConfigError> {
+        let filter = EnvFilter::try_new(file.get_or("logging.filter", "info".to_owned())?)
+            .map_err(|_| ConfigError::invalid("logging.filter", "invalid tracing filter"))?;
+        let directory = file.get_or("logging.file_dir", String::new())?;
+        let file_enabled = !directory.trim().is_empty();
+        Ok(Self {
+            filter, stdout: file.get_or("logging.stdout_enabled", true)?, file_enabled,
+            directory: if file_enabled { directory.into() } else { "logs".into() },
+            ..Self::default()
+        })
     }
 }
 

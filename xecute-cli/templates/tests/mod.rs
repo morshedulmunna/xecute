@@ -8,3 +8,5 @@ mod server;
 mod support;
 
 mod static_files;
+
+mod application;

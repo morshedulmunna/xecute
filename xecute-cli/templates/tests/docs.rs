@@ -82,7 +82,7 @@ async fn disabling_swagger_removes_ui_and_spec_routes() {
         );
     }
     assert!(
-        Config::from_lookup(|key| Ok((key == "SWAGGER_ENABLED").then(|| "invalid".into())))
+        Config::from_config(&crate::configs::ConfigFile::parse("[docs]\nenabled = \"invalid\"").unwrap())
             .is_err()
     );
 }

@@ -9,7 +9,7 @@ mod server;
 
 pub use cors::CorsConfig;
 pub use docs::DocsConfig;
-pub use environment::{load_env, read_env};
+pub use environment::{ConfigError, ConfigFile, Env, load_env, read_env};
 pub use static_files::StaticConfig;
 pub use logging::LoggingConfig;
 pub use server::Config;

@@ -47,8 +47,7 @@ impl __TYPE__Controller {
         let entity = self
             .service
             .create(request)
-            .await
-            .map_err(|_| HttpError::new(HttpStatus::SERVICE_UNAVAILABLE))?;
+            .await?;
 
         Ok((HttpStatus::CREATED, Json(entity)))
     }

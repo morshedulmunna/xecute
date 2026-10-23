@@ -9,7 +9,7 @@ use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
     fmt,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, OnceLock},
 };
 
 pub use xmacros::*;
@@ -17,6 +17,19 @@ pub use xmacros::*;
 /// HTTP middleware and application pipeline composition.
 pub mod middleware;
 pub use middleware::Application;
+
+/// In-process HTTP tests and isolated provider overrides.
+#[cfg(feature = "testing")]
+pub mod testing;
+
+/// Typed configuration readers and redacted validation errors.
+pub mod config;
+
+mod scoped;
+pub use scoped::{Inject, with_container};
+
+/// Safe HTTP error envelopes, normalization, and request correlation.
+pub mod exceptions;
 
 mod http;
 mod openapi;
@@ -26,7 +39,7 @@ pub use openapi::{DocumentationError, json_schema, openapi_document};
 /// Common controller types and macros.
 pub mod prelude {
     pub use crate::{
-        Application, HttpError, HttpStatus, Injectable, controller, middleware, routes,
+        Application, HttpError, HttpStatus, Inject, Injectable, controller, middleware, routes,
     };
     pub use axum::{
         Json,
@@ -35,6 +48,7 @@ pub mod prelude {
 }
 
 type DynValue = dyn Any + Send + Sync;
+type Cache = Mutex<HashMap<ProviderKey, Arc<OnceLock<Result<Arc<DynValue>, InjectError>>>>>;
 type Factory = dyn Fn(&Container) -> Result<Arc<DynValue>, InjectError> + Send + Sync;
 
 /// The lifecycle of a provider instance.
@@ -76,6 +90,8 @@ impl ProviderKey {
 pub enum InjectError {
     /// A required provider was not registered.
     Missing(&'static str),
+    /// More than one module definition uses the same module name.
+    DuplicateModule(&'static str),
     /// More than one registration uses the same provider key.
     DuplicateProvider(&'static str),
     /// An importing module requested a provider that was not exported.
@@ -108,8 +124,19 @@ pub enum InjectError {
         /// Dependency with an incompatible scope.
         dependency: &'static str,
     },
+    /// A request-scoped provider was resolved without an active request.
+    RequestScopeRequired(&'static str),
+    /// A factory resolved a dependency not declared in its metadata.
+    UndeclaredDependency {
+        /// Factory performing the resolution.
+        owner: &'static str,
+        /// Dependency missing from the factory metadata.
+        dependency: &'static str,
+    },
     /// A factory returned a value of the wrong concrete type.
     Downcast(&'static str),
+    /// A provider could not be constructed; the static message must not contain secrets.
+    ConstructionFailed(&'static str),
     /// A synchronization lock was poisoned by a panic.
     Poisoned,
 }
@@ -117,6 +144,7 @@ impl fmt::Display for InjectError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Missing(n) => write!(f, "missing provider: {n}"),
+            Self::DuplicateModule(n) => write!(f, "duplicate module: {n}"),
             Self::DuplicateProvider(n) => write!(f, "duplicate provider: {n}"),
             Self::PrivateProviderAccess { provider, module } => write!(
                 f,
@@ -134,7 +162,13 @@ impl fmt::Display for InjectError {
                 f,
                 "invalid scope dependency: singleton {owner} depends on request-scoped {dependency}"
             ),
+            Self::RequestScopeRequired(n) => write!(f, "request scope required for provider: {n}"),
+            Self::UndeclaredDependency { owner, dependency } => write!(
+                f,
+                "provider {owner} resolved undeclared dependency {dependency}"
+            ),
             Self::Downcast(n) => write!(f, "provider {n} returned an incompatible value"),
+            Self::ConstructionFailed(reason) => write!(f, "provider construction failed: {reason}"),
             Self::Poisoned => write!(f, "container lock was poisoned"),
         }
     }
@@ -146,6 +180,7 @@ pub struct ProviderDefinition {
     key: ProviderKey,
     scope: Scope,
     dependencies: Vec<ProviderKey>,
+    optional_dependencies: Vec<ProviderKey>,
     factory: Arc<Factory>,
 }
 impl fmt::Debug for ProviderDefinition {
@@ -169,6 +204,7 @@ impl ProviderDefinition {
             key: ProviderKey::of::<T>(),
             scope,
             dependencies,
+            optional_dependencies: Vec::new(),
             factory: Arc::new(move |c| factory(c).map(|v| Arc::new(v) as Arc<DynValue>)),
         }
     }
@@ -180,6 +216,42 @@ impl ProviderDefinition {
         F: Fn(&Container) -> Result<T, InjectError> + Send + Sync + 'static,
     {
         Self::new(Scope::Singleton, dependencies, factory)
+    }
+    #[must_use]
+    /// Register a factory reused within each independent request context.
+    pub fn request<T, F>(dependencies: Vec<ProviderKey>, factory: F) -> Self
+    where
+        T: Send + Sync + 'static,
+        F: Fn(&Container) -> Result<T, InjectError> + Send + Sync + 'static,
+    {
+        Self::new(Scope::Request, dependencies, factory)
+    }
+    #[must_use]
+    /// Register a factory constructing a fresh instance on every resolution.
+    pub fn transient<T, F>(dependencies: Vec<ProviderKey>, factory: F) -> Self
+    where
+        T: Send + Sync + 'static,
+        F: Fn(&Container) -> Result<T, InjectError> + Send + Sync + 'static,
+    {
+        Self::new(Scope::Transient, dependencies, factory)
+    }
+    #[must_use]
+    /// Register one preconstructed value, useful for application settings and test doubles.
+    pub fn value<T: Send + Sync + 'static>(value: T) -> Self {
+        let value: Arc<DynValue> = Arc::new(value);
+        Self {
+            key: ProviderKey::of::<T>(),
+            scope: Scope::Singleton,
+            dependencies: Vec::new(),
+            optional_dependencies: Vec::new(),
+            factory: Arc::new(move |_| Ok(value.clone())),
+        }
+    }
+    #[must_use]
+    /// Mark one declared dependency as optional for startup registration validation.
+    pub fn optional_dependency<T: 'static>(mut self) -> Self {
+        self.optional_dependencies.push(ProviderKey::of::<T>());
+        self
     }
     #[must_use]
     /// Return the type key identifying this provider.
@@ -208,6 +280,10 @@ pub trait Provider: Send + Sync + 'static {
     fn dependencies() -> Vec<ProviderKey> {
         Vec::new()
     }
+    /// Optional dependency keys which may be absent at startup.
+    fn optional_dependencies() -> Vec<ProviderKey> {
+        Vec::new()
+    }
     /// Construct a provider using dependencies from the container.
     fn provide(container: &Container) -> Result<Self, InjectError>
     where
@@ -217,15 +293,31 @@ pub trait Provider: Send + Sync + 'static {
     where
         Self: Sized,
     {
-        ProviderDefinition::new(Self::scope(), Self::dependencies(), Self::provide)
+        let mut definition =
+            ProviderDefinition::new(Self::scope(), Self::dependencies(), Self::provide);
+        definition.optional_dependencies = Self::optional_dependencies();
+        definition
     }
 }
 
-/// Thread-safe provider container. Singleton values are cached for its lifetime.
-#[derive(Default)]
+/// Thread-safe provider container with shared singleton and isolated request caches.
+#[derive(Clone, Default)]
 pub struct Container {
-    providers: HashMap<ProviderKey, ProviderDefinition>,
-    singletons: Mutex<HashMap<ProviderKey, Arc<DynValue>>>,
+    providers: Arc<HashMap<ProviderKey, ProviderDefinition>>,
+    singletons: Arc<Cache>,
+    request_values: Option<Arc<Cache>>,
+}
+
+thread_local! {
+    static RESOLVING: RefCell<Vec<(usize, ProviderKey)>> = const { RefCell::new(Vec::new()) };
+}
+struct ResolutionGuard;
+impl Drop for ResolutionGuard {
+    fn drop(&mut self) {
+        RESOLVING.with(|path| {
+            path.borrow_mut().pop();
+        });
+    }
 }
 impl Container {
     #[must_use]
@@ -233,56 +325,104 @@ impl Container {
     pub fn builder() -> ContainerBuilder {
         ContainerBuilder::default()
     }
-    /// Resolve a dependency, applying its configured lifecycle.
+    /// Resolve a provider; request providers require a request context.
     pub fn resolve<T: Send + Sync + 'static>(&self) -> Result<Arc<T>, InjectError> {
         self.resolve_key(ProviderKey::of::<T>())?
             .downcast::<T>()
             .map_err(|_| InjectError::Downcast(type_name::<T>()))
     }
-    /// Resolve a dependency if it is registered; propagate construction failures.
+    /// Return None only for an unregistered optional provider; propagate factory failures.
     pub fn resolve_optional<T: Send + Sync + 'static>(
         &self,
     ) -> Result<Option<Arc<T>>, InjectError> {
-        match self.resolve::<T>() {
-            Ok(v) => Ok(Some(v)),
-            Err(InjectError::Missing(_)) => Ok(None),
-            Err(e) => Err(e),
+        if !self.providers.contains_key(&ProviderKey::of::<T>()) {
+            return Ok(None);
         }
+        self.resolve().map(Some)
     }
     fn resolve_key(&self, key: ProviderKey) -> Result<Arc<DynValue>, InjectError> {
         let definition = self
             .providers
             .get(&key)
             .ok_or(InjectError::Missing(key.name))?;
-        if definition.scope == Scope::Request {
-            return Err(InjectError::Missing(key.name));
-        }
-        if definition.scope == Scope::Singleton
-            && let Some(value) = self
-                .singletons
-                .lock()
-                .map_err(|_| InjectError::Poisoned)?
-                .get(&key)
-                .cloned()
-        {
-            return Ok(value);
-        }
-        let value = (definition.factory)(self)?;
-        if definition.scope == Scope::Singleton {
-            self.singletons
-                .lock()
-                .map_err(|_| InjectError::Poisoned)?
-                .insert(key, value.clone());
-        }
-        Ok(value)
+        let identity = Arc::as_ptr(&self.providers) as usize;
+        RESOLVING.with(|path| {
+            let mut path = path.borrow_mut();
+            if let Some(index) = path.iter().position(|entry| *entry == (identity, key)) {
+                let mut chain = path[index..]
+                    .iter()
+                    .map(|entry| entry.1.name)
+                    .collect::<Vec<_>>();
+                chain.push(key.name);
+                return Err(InjectError::Circular(chain));
+            }
+            if let Some((id, parent)) = path.last()
+                && *id == identity
+                && !self.providers[parent].dependencies.contains(&key)
+            {
+                return Err(InjectError::UndeclaredDependency {
+                    owner: parent.name,
+                    dependency: key.name,
+                });
+            }
+            path.push((identity, key));
+            Ok(())
+        })?;
+        let _guard = ResolutionGuard;
+        let cache = match definition.scope {
+            Scope::Transient => return (definition.factory)(self),
+            Scope::Singleton => &self.singletons,
+            Scope::Request => self
+                .request_values
+                .as_ref()
+                .ok_or(InjectError::RequestScopeRequired(key.name))?,
+        };
+        // Lock only to obtain the per-provider slot. Factories can resolve other slots.
+        let slot = cache
+            .lock()
+            .map_err(|_| InjectError::Poisoned)?
+            .entry(key)
+            .or_default()
+            .clone();
+        // Successful instances and construction errors are deterministic within the scope.
+        // OnceLock serializes concurrent initialization without holding the cache lock.
+        slot.get_or_init(|| {
+            if definition.scope == Scope::Singleton {
+                // Singletons must never retain the first HTTP request's resolution context.
+                let root = Self {
+                    providers: self.providers.clone(),
+                    singletons: self.singletons.clone(),
+                    request_values: None,
+                };
+                (definition.factory)(&root)
+            } else {
+                (definition.factory)(self)
+            }
+        })
+        .clone()
     }
     #[must_use]
-    /// Start a request-local cache for request-scoped dependencies.
-    pub fn request(&self) -> RequestContainer<'_> {
-        RequestContainer {
-            container: self,
-            values: HashMap::new(),
+    /// Start an independent request cache while sharing application singletons.
+    pub fn request(&self) -> RequestScope {
+        RequestScope {
+            container: Self {
+                providers: self.providers.clone(),
+                singletons: self.singletons.clone(),
+                request_values: Some(Arc::default()),
+            },
         }
+    }
+    /// Eagerly construct singletons so factory failures are reported before listening.
+    /// Request and transient factories are constructed only when resolved.
+    pub fn initialize(&self) -> Result<(), InjectError> {
+        for definition in self
+            .providers
+            .values()
+            .filter(|definition| definition.scope == Scope::Singleton)
+        {
+            self.resolve_key(definition.key)?;
+        }
+        Ok(())
     }
 }
 
@@ -290,6 +430,7 @@ impl Container {
 #[derive(Default)]
 pub struct ContainerBuilder {
     providers: Vec<ProviderDefinition>,
+    overrides: Vec<ProviderDefinition>,
 }
 impl ContainerBuilder {
     #[must_use]
@@ -303,6 +444,21 @@ impl ContainerBuilder {
     pub fn injectable<T: Provider>(self) -> Self {
         self.provider(T::definition())
     }
+    /// Replace an existing provider for an isolated test container.
+    #[must_use]
+    pub fn override_provider(mut self, provider: ProviderDefinition) -> Self {
+        self.overrides.push(provider);
+        self
+    }
+    /// Register a preconstructed value such as a trait adapter or test double.
+    #[must_use]
+    pub fn value<T: Send + Sync + 'static>(self, value: T) -> Self {
+        self.provider(ProviderDefinition::value(value))
+    }
+    #[cfg(feature = "testing")]
+    pub(crate) fn into_definitions(self) -> Vec<ProviderDefinition> {
+        self.providers
+    }
     /// Validate registrations and dependency relationships before constructing the container.
     pub fn build(self) -> Result<Container, InjectError> {
         let mut providers = HashMap::new();
@@ -312,11 +468,32 @@ impl ContainerBuilder {
                 return Err(InjectError::DuplicateProvider(key.name));
             }
         }
+        let mut overrides = HashSet::new();
+        for replacement in self.overrides {
+            let key = replacement.key;
+            if !overrides.insert(key) {
+                return Err(InjectError::DuplicateProvider(key.name));
+            }
+            if !providers.contains_key(&key) {
+                return Err(InjectError::Missing(key.name));
+            }
+            providers.insert(key, replacement);
+        }
+        for provider in providers.values() {
+            for dependency in &provider.dependencies {
+                if !providers.contains_key(dependency)
+                    && !provider.optional_dependencies.contains(dependency)
+                {
+                    return Err(InjectError::Missing(dependency.name));
+                }
+            }
+        }
         validate_provider_scopes(&providers)?;
         validate_provider_cycles(&providers)?;
         Ok(Container {
-            providers,
-            singletons: Mutex::new(HashMap::new()),
+            providers: Arc::new(providers),
+            singletons: Arc::default(),
+            request_values: None,
         })
     }
 }
@@ -362,52 +539,55 @@ fn validate_provider_cycles(
 fn validate_provider_scopes(
     providers: &HashMap<ProviderKey, ProviderDefinition>,
 ) -> Result<(), InjectError> {
-    for provider in providers.values() {
-        for dependency in &provider.dependencies {
-            if let Some(dependency) = providers.get(dependency)
-                && provider.scope == Scope::Singleton
-                && dependency.scope == Scope::Request
-            {
-                return Err(InjectError::InvalidScopeDependency {
-                    owner: provider.key.name,
-                    dependency: dependency.key.name,
-                });
+    for provider in providers
+        .values()
+        .filter(|provider| provider.scope == Scope::Singleton)
+    {
+        let mut pending = provider.dependencies.clone();
+        let mut visited = HashSet::new();
+        while let Some(key) = pending.pop() {
+            if !visited.insert(key) {
+                continue;
+            }
+            if let Some(dependency) = providers.get(&key) {
+                if dependency.scope == Scope::Request {
+                    return Err(InjectError::InvalidScopeDependency {
+                        owner: provider.key.name,
+                        dependency: key.name,
+                    });
+                }
+                pending.extend_from_slice(&dependency.dependencies);
             }
         }
     }
     Ok(())
 }
 
-/// Per-request provider cache. Request-scoped values cannot escape this type.
-pub struct RequestContainer<'a> {
-    container: &'a Container,
-    values: HashMap<ProviderKey, Arc<DynValue>>,
+/// Owned request-local provider cache. Clones share only this request's values.
+/// Returned Arcs can outlive the HTTP request if retained by application code.
+#[derive(Clone)]
+pub struct RequestScope {
+    container: Container,
 }
-impl RequestContainer<'_> {
-    /// Resolve a dependency, applying its configured lifecycle.
-    pub fn resolve<T: Send + Sync + 'static>(&mut self) -> Result<Arc<T>, InjectError> {
-        let key = ProviderKey::of::<T>();
-        let definition = self
-            .container
-            .providers
-            .get(&key)
-            .ok_or(InjectError::Missing(key.name))?;
-        let value = if definition.scope == Scope::Request {
-            if let Some(v) = self.values.get(&key) {
-                v.clone()
-            } else {
-                let v = (definition.factory)(self.container)?;
-                self.values.insert(key, v.clone());
-                v
-            }
-        } else {
-            self.container.resolve_key(key)?
-        };
-        value
-            .downcast::<T>()
-            .map_err(|_| InjectError::Downcast(type_name::<T>()))
+impl RequestScope {
+    pub(crate) fn belongs_to(&self, container: &Container) -> bool {
+        Arc::ptr_eq(&self.container.providers, &container.providers)
+    }
+    /// Resolve nested request, transient, and singleton dependencies in this request.
+    pub fn resolve<T: Send + Sync + 'static>(&self) -> Result<Arc<T>, InjectError> {
+        self.container.resolve()
+    }
+    /// Resolve an optional provider without hiding factory failures.
+    pub fn resolve_optional<T: Send + Sync + 'static>(
+        &self,
+    ) -> Result<Option<Arc<T>>, InjectError> {
+        self.container.resolve_optional()
     }
 }
+
+/// Compatibility name for the owned request scope; the lifetime no longer restricts ownership.
+/// Existing `RequestContainer<'a>` type annotations continue to compile.
+pub type RequestContainer<'a> = RequestScope;
 
 /// Declarative module metadata, used to validate imports and exports.
 #[derive(Debug)]
@@ -463,19 +643,31 @@ impl ModuleDefinition {
 
 /// Validates module metadata and flattens modules into a container.
 pub struct ModuleGraph {
-    modules: HashMap<&'static str, ModuleDefinition>,
+    modules: Vec<ModuleDefinition>,
 }
 impl ModuleGraph {
     #[must_use]
     /// Create a new instance from the supplied definition inputs.
     pub fn new(modules: Vec<ModuleDefinition>) -> Self {
-        Self {
-            modules: modules.into_iter().map(|m| (m.name, m)).collect(),
-        }
+        Self { modules }
     }
     /// Validate registrations and dependency relationships before constructing the container.
     pub fn build(self) -> Result<Container, InjectError> {
-        for module in self.modules.values() {
+        self.build_with_overrides(Vec::new())
+    }
+    /// Validate module metadata and replace selected provider factories for tests.
+    pub fn build_with_overrides(
+        self,
+        overrides: Vec<ProviderDefinition>,
+    ) -> Result<Container, InjectError> {
+        let mut modules = HashMap::new();
+        for module in self.modules {
+            let name = module.name;
+            if modules.insert(name, module).is_some() {
+                return Err(InjectError::DuplicateModule(name));
+            }
+        }
+        for module in modules.values() {
             let owned: HashSet<_> = module
                 .providers
                 .iter()
@@ -490,7 +682,7 @@ impl ModuleGraph {
                 }
             }
             for import in &module.imports {
-                if !self.modules.contains_key(import) {
+                if !modules.contains_key(import) {
                     return Err(InjectError::InvalidImport {
                         module: module.name,
                         import,
@@ -498,11 +690,43 @@ impl ModuleGraph {
                 }
             }
         }
+        for module in modules.values() {
+            let mut visible: HashSet<_> = module
+                .providers
+                .iter()
+                .map(ProviderDefinition::key)
+                .collect();
+            for imported in modules
+                .values()
+                .filter(|candidate| candidate.global || module.imports.contains(&candidate.name))
+            {
+                visible.extend(imported.exports.iter().copied());
+            }
+            for provider in &module.providers {
+                for dependency in &provider.dependencies {
+                    let registered = modules.values().any(|candidate| {
+                        candidate
+                            .providers
+                            .iter()
+                            .any(|provider| provider.key == *dependency)
+                    });
+                    if registered && !visible.contains(dependency) {
+                        return Err(InjectError::PrivateProviderAccess {
+                            provider: dependency.name,
+                            module: module.name,
+                        });
+                    }
+                }
+            }
+        }
         let mut builder = Container::builder();
-        for module in self.modules.into_values() {
+        for module in modules.into_values() {
             for provider in module.providers {
                 builder = builder.provider(provider);
             }
+        }
+        for replacement in overrides {
+            builder = builder.override_provider(replacement);
         }
         builder.build()
     }
