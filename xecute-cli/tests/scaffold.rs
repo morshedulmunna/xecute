@@ -106,3 +106,88 @@ fn new_project_is_formatted_locked_and_accepts_resources() {
     assert!(app.contains("UserController::router"));
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn architecture_selection_persists_and_invalid_flags_do_not_create_projects() {
+    let root = std::env::temp_dir().join(format!("xecute-architecture-{}", std::process::id()));
+    fs::create_dir_all(&root).unwrap();
+    let binary = env!("CARGO_BIN_EXE_xecute");
+    for (project, flags, architecture) in [
+        ("cqrs-api", vec!["--cqrs"], "cqrs"),
+        ("mvc-api", vec![], "mvc"),
+        ("explicit-mvc-api", vec!["--mvc"], "mvc"),
+    ] {
+        assert!(
+            Command::new(binary)
+                .args(["new", project])
+                .args(flags)
+                .current_dir(&root)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let project = root.join(project);
+        assert_eq!(
+            fs::read_to_string(project.join(".xecute/architecture"))
+                .unwrap()
+                .trim(),
+            architecture
+        );
+        assert!(
+            Command::new(binary)
+                .args(["g", "res", "user-profile"])
+                .current_dir(&project)
+                .status()
+                .unwrap()
+                .success()
+        );
+        for feature in ["example", "user_profile"] {
+            let feature = project.join("src").join(feature);
+            assert_eq!(feature.join("service.rs").exists(), architecture == "mvc");
+            assert_eq!(
+                feature.join("commands/create.rs").exists(),
+                architecture == "cqrs"
+            );
+            assert_eq!(
+                feature.join("queries/list.rs").exists(),
+                architecture == "cqrs"
+            );
+        }
+        let before = fs::read_to_string(project.join("src/app_module.rs")).unwrap();
+        fs::write(project.join(".xecute/architecture"), "invalid").unwrap();
+        assert!(
+            !Command::new(binary)
+                .args(["g", "res", "invalid-config"])
+                .current_dir(&project)
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(!project.join("src/invalid_config").exists());
+        assert_eq!(
+            fs::read_to_string(project.join("src/app_module.rs")).unwrap(),
+            before
+        );
+    }
+    for flags in [
+        vec!["--bad"],
+        vec!["--mvc", "--mvc"],
+        vec!["--cqrs", "--cqrs"],
+        vec!["--mvc", "--cqrs"],
+        vec!["--cqrs", "--mvc"],
+        vec!["--runtime-path"],
+        vec!["--runtime-path", "--mvc"],
+    ] {
+        assert!(
+            !Command::new(binary)
+                .args(["new", "bad-api"])
+                .args(flags)
+                .current_dir(&root)
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(!root.join("bad-api").exists());
+    }
+    fs::remove_dir_all(root).unwrap();
+}

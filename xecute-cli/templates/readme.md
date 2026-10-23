@@ -135,7 +135,7 @@ Types keep feature names such as `AuthController`, `AuthService`, and `AuthModul
 Macros are imported once and used as `#[controller]`, `#[injectable]`, and
 `#[module]`; method attributes such as `#[get]` are consumed by `#[controller]`.
 
-Resource generation includes `dto/`, `entity/`, `repository/`, and an HTTP test in `src/tests/`. DTOs use `validator` to reject invalid JSON payloads with HTTP 422 before saving. The included repository is bounded in-memory example storage; replace it with a database for durable production data.
+Resource generation includes `dto/`, `entity/`, `repository/`, and an HTTP test in `src/tests/`. CQRS projects add `commands/` and `queries/`; MVC projects add `service.rs`. DTOs use `validator` to reject invalid JSON payloads with HTTP 422 before saving. The included repository is bounded in-memory example storage; replace it with a database for durable production data.
 
 ```sh
 curl -X POST http://localhost:3000/user -H 'content-type: application/json' -d '{"name":"Example"}'
@@ -160,3 +160,23 @@ Repositories use `#[derive(Injectable)]` and are registered in the module’s
 `providers` list. `#[inject(default)]` initializes provider-owned storage;
 other dependency fields are auto-resolved. The default singleton scope lets
 services share the same repository state.
+
+## Architecture
+
+This project uses **__ARCHITECTURE__** architecture. `.xecute/architecture` records
+this choice; commit it so subsequent `xecute g resource <name>` commands use the
+same layout. New projects default to MVC with the
+controller → service → repository layout. Use `xecute new my-api --cqrs` for
+command/query handlers; `--mvc` explicitly selects MVC. Projects without the architecture file
+retain the legacy MVC layout. Invalid configuration stops generation.
+
+CQRS resources contain `commands/create.rs` and `queries/list.rs`, each with its
+input type and injectable handler. Controllers validate DTOs automatically, map
+them to commands, and invoke handlers through dependency injection. Both handlers
+share the singleton repository, so writes are visible to subsequent reads.
+There is no service layer in CQRS resources. Separate databases, event sourcing,
+and command/query buses are optional extensions. The initial endpoints are GET
+(collection) and POST (create); add further operations as the feature grows.
+
+Standalone module, controller, and service generators remain available in both
+architectures; standalone services are opt-in building blocks.

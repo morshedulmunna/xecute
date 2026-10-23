@@ -26,6 +26,21 @@ async fn creation_validates_before_persisting() {
             expected
         );
     }
+    // Decoding and validation failures must not reach the command/service or storage.
+    for (payload, expected) in [
+        ("not-json", StatusCode::BAD_REQUEST),
+        (r#"{}"#, StatusCode::UNPROCESSABLE_ENTITY),
+        (r#"{"name":42}"#, StatusCode::UNPROCESSABLE_ENTITY),
+        (r#"{"name":"Example","unexpected":true}"#, StatusCode::UNPROCESSABLE_ENTITY),
+    ] {
+        let request = Request::builder()
+            .method("POST")
+            .uri("/__FEATURE__")
+            .header("content-type", "application/json")
+            .body(Body::from(payload))
+            .unwrap();
+        assert_eq!(app.clone().oneshot(request).await.unwrap().status(), expected);
+    }
     let response = app
         .oneshot(
             Request::builder()

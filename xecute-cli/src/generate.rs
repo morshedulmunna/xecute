@@ -6,6 +6,37 @@ use std::{
 
 type Result<T> = std::result::Result<T, String>;
 
+/// Project generation style, persisted for subsequent resource generators.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Architecture {
+    Cqrs,
+    Mvc,
+}
+
+impl Architecture {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Cqrs => "cqrs",
+            Self::Mvc => "mvc",
+        }
+    }
+
+    fn read(root: &Path) -> Result<Self> {
+        match fs::read_to_string(root.join(".xecute/architecture")) {
+            Ok(value) => match value.trim() {
+                "cqrs" => Ok(Self::Cqrs),
+                "mvc" => Ok(Self::Mvc),
+                _ => Err(
+                    "invalid .xecute/architecture: expected cqrs or mvc; no files changed".into(),
+                ),
+            },
+            // Projects created before architecture selection retain their service layout.
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::Mvc),
+            Err(error) => Err(format!("cannot read .xecute/architecture: {error}")),
+        }
+    }
+}
+
 fn names(input: &str) -> Result<(String, String)> {
     if input.is_empty()
         || !input
@@ -103,7 +134,7 @@ fn format_files(root: &Path, paths: &[String]) -> Result<()> {
     Ok(())
 }
 
-pub fn new_project(name: &str, runtime: Option<&Path>) -> Result<()> {
+pub fn new_project(name: &str, runtime: Option<&Path>, architecture: Architecture) -> Result<()> {
     names(name)?;
     let root = PathBuf::from(name);
     if root.exists() {
@@ -131,6 +162,11 @@ pub fn new_project(name: &str, runtime: Option<&Path>) -> Result<()> {
         &include_str!("../templates/Cargo.toml.tmpl")
             .replace("__PROJECT_NAME__", name)
             .replace("__RUNTIME_DEPENDENCY__", &dependency),
+    )?;
+    fs::create_dir(root.join(".xecute")).map_err(|e| e.to_string())?;
+    write(
+        &root.join(".xecute/architecture"),
+        &format!("{}\n", architecture.name()),
     )?;
     write(&root.join(".gitignore"), "/target/\n.env\n")?;
     let mut formatted = Vec::new();
@@ -270,7 +306,9 @@ pub fn new_project(name: &str, runtime: Option<&Path>) -> Result<()> {
     )?;
     write(
         &root.join("README.md"),
-        &include_str!("../templates/readme.md").replace("__PROJECT_NAME__", name),
+        &include_str!("../templates/readme.md")
+            .replace("__PROJECT_NAME__", name)
+            .replace("__ARCHITECTURE__", architecture.name()),
     )?;
     if runtime.is_none() {
         write(
@@ -281,7 +319,10 @@ pub fn new_project(name: &str, runtime: Option<&Path>) -> Result<()> {
     formatted.push("src/app_module.rs".into());
     format_files(&root, &formatted)?;
     component(&root, "resource", "example")?;
-    println!("Created {name}\n  cd {name}\n  cargo run\n  Swagger: http://127.0.0.1:3000/docs/");
+    println!(
+        "Created {name} ({})\n  cd {name}\n  cargo run\n  Swagger: http://127.0.0.1:3000/docs/",
+        architecture.name()
+    );
     Ok(())
 }
 
@@ -293,6 +334,8 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
         "service" | "s" => "service",
         _ => return Err("generator must be resource, module, controller, or service".into()),
     };
+    let architecture = Architecture::read(root)?;
+    let cqrs = kind == "resource" && architecture == Architecture::Cqrs;
     let (snake, pascal) = names(name)?;
     if matches!(snake.as_str(), "app_module" | "main") {
         return Err("name conflicts with application files".into());
@@ -334,7 +377,9 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
     }
     .replace("__TYPE__", &pascal)
     .replace("__FEATURE__", &snake);
-    let controller = if kind == "resource" {
+    let controller = if cqrs {
+        include_str!("../templates/cqrs/controller.rs.tmpl")
+    } else if kind == "resource" {
         include_str!("../templates/resource/controller.rs.tmpl")
     } else {
         include_str!("../templates/resource/standalone_controller.rs.tmpl")
@@ -343,7 +388,7 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
     .replace("__FEATURE__", &snake);
     let mut files: Vec<(String, String)> = Vec::new();
     let mut mods = format!("//! Public building blocks for the {snake} feature.\n\n");
-    if matches!(kind, "resource" | "service") {
+    if !cqrs && matches!(kind, "resource" | "service") {
         files.push(("service.rs".into(), service));
         mods.push_str(&format!(
             "mod service;\npub use service::{pascal}Service;\n"
@@ -356,7 +401,9 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
         ));
     }
     if matches!(kind, "resource" | "module") {
-        let module = if kind == "resource" {
+        let module = if cqrs {
+            include_str!("../templates/cqrs/module.rs.tmpl").replace("__TYPE__", &pascal)
+        } else if kind == "resource" {
             include_str!("../templates/resource/module.rs.tmpl").replace("__TYPE__", &pascal)
         } else {
             format!(
@@ -406,6 +453,23 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
         }
         files.push(("repository/mod.rs".into(), format!("//! Persistence adapters for this feature.\n\nmod store;\npub use store::{{{pascal}Repository, CapacityExceeded}};\n")));
         mods.push_str("\npub mod dto;\npub mod entity;\npub mod repository;\n");
+    }
+    if cqrs {
+        for (path, template) in [
+            (
+                "commands/create.rs",
+                include_str!("../templates/cqrs/create.rs.tmpl"),
+            ),
+            (
+                "queries/list.rs",
+                include_str!("../templates/cqrs/list.rs.tmpl"),
+            ),
+        ] {
+            files.push((path.into(), template.replace("__TYPE__", &pascal)));
+        }
+        files.push(("commands/mod.rs".into(), format!("//! Write operations.\nmod create;\npub use create::{{Create{pascal}Command, Create{pascal}Handler}};\n")));
+        files.push(("queries/mod.rs".into(), format!("//! Read operations.\nmod list;\npub use list::{{List{pascal}Query, List{pascal}Handler}};\n")));
+        mods.push_str("\npub mod commands;\npub mod queries;\n");
     }
     files.push(("mod.rs".into(), mods));
     let declaration = format!("pub mod {snake};\n");
