@@ -2,7 +2,8 @@
 
 ```sh
 cp .env.example .env
-cargo run
+xecute run dev
+# Single run without watching: cargo run
 # Swagger UI: http://127.0.0.1:3000/docs/
 # Example collection: GET http://127.0.0.1:3000/example
 cargo test --locked
@@ -211,3 +212,26 @@ middleware annotations so the owning macros can process them.
 
 Existing projects can wrap their assembled router with
 `xecute::Application::new(router).use_middleware(auth).into_router()`.
+
+## Development hot reload
+
+Run `xecute run dev` from this project root to automatically rebuild and restart
+the debug server on source/configuration changes. A failed compilation keeps the
+watcher alive; the next edit retries it. Compiler output and server logs remain
+visible. Ctrl-C stops the watcher and its managed application processes.
+
+```sh
+xecute run dev
+xecute run dev --bin your-binary
+xecute run dev --watch ../shared-library
+```
+
+Use CLI 0.1.7 or later. No separate watcher is required. The watcher polls every
+200 ms and debounces for 300 ms. It monitors Rust/configuration/web source files,
+`Cargo.lock`, `.env`, and `.env.*`; target output, VCS, dependency, and build
+folders are excluded. External path dependencies need explicit `--watch` paths.
+
+Reload restarts the process, so in-memory repository data resets. Browser refresh
+is not automatic. Unix allows five seconds for managed processes to stop before
+forcing termination; Windows terminates the process tree. Use `cargo run` for a
+single run and a release build for production. Hot reload is development-only.

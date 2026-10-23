@@ -154,7 +154,7 @@ pub fn new_project(name: &str, runtime: Option<&Path>, architecture: Architectur
             .replace('"', "\\\"");
         format!("xecute = {{ path = \"{runtime}\" }}")
     } else {
-        "xecute = \"0.1.4\"".to_owned()
+        "xecute = \"0.1.5\"".to_owned()
     };
     fs::create_dir_all(root.join("src")).map_err(|e| e.to_string())?;
     write(
@@ -324,7 +324,7 @@ pub fn new_project(name: &str, runtime: Option<&Path>, architecture: Architectur
     format_files(&root, &formatted)?;
     component(&root, "resource", "example")?;
     println!(
-        "Created {name} ({})\n  cd {name}\n  cargo run\n  Swagger: http://127.0.0.1:3000/docs/",
+        "Created {name} ({})\n  cd {name}\n  xecute run dev\n  Swagger: http://127.0.0.1:3000/docs/",
         architecture.name()
     );
     Ok(())
@@ -518,10 +518,11 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
                         .split_once('=')
                         .is_some_and(|(key, _)| key.trim() == "xecute")
                     {
-                        line.replace("\"0.1.0\"", "\"0.1.4\"")
-                            .replace("\"0.1.1\"", "\"0.1.4\"")
-                            .replace("\"0.1.2\"", "\"0.1.4\"")
-                            .replace("\"0.1.3\"", "\"0.1.4\"")
+                        line.replace("\"0.1.0\"", "\"0.1.5\"")
+                            .replace("\"0.1.1\"", "\"0.1.5\"")
+                            .replace("\"0.1.2\"", "\"0.1.5\"")
+                            .replace("\"0.1.3\"", "\"0.1.5\"")
+                            .replace("\"0.1.4\"", "\"0.1.5\"")
                     } else {
                         line.to_owned()
                     }

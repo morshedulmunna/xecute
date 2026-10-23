@@ -27,6 +27,9 @@ Resources expose GET and POST endpoints. POST validates a `name` payload with
 
 Commands:
 
+- `run dev [--bin <name>] [--watch <path>] [-- <app arguments>]`: run the debug
+  application with automatic rebuild/restart on source and configuration changes.
+
 - `new <project> [--mvc | --cqrs] [--runtime-path <path>]`: create an independent Axum project.
 - `generate resource <name>` / `g res <name>`: create and register a module,
   controller, DTO, entity, repository, and HTTP test, with a service
@@ -42,7 +45,7 @@ No `#[path]` annotations are generated. Existing component folders are never
 overwritten. Run generation from the project root. Automatic registration uses
 the comments in `app_module.rs`; keep these markers when editing that file.
 
-Generated projects use `xecute = "0.1.4"` from crates.io by default.
+Generated projects use `xecute = "0.1.5"` from crates.io by default.
 Use `xecute new my-api --runtime-path /path/to/xecute/xecute` for local development.
 
 Generated CQRS resource folders contain `module.rs`, `controller.rs`,
@@ -81,3 +84,25 @@ inside that impl. Register global middleware in generated `src/middleware.rs`
 with `app.use_middleware(auth)`. Execution follows app → controller → route →
 validation → handler, with declaration order within each scope. Middleware can
 return early or call `next.run(request).await` to continue.
+
+## Development hot reload
+
+Run `xecute run dev` from an application root containing `Cargo.toml`. It starts
+`cargo run`, polls source/configuration metadata every 200 ms, and debounces edits
+for 300 ms. Build failures keep the watcher alive for the next edit. Ctrl-C stops
+the managed Cargo/server processes; no external watcher installation is required.
+
+Use `--bin server` for multiple binaries, repeat `--watch ../path` for external
+source dependencies, and put application arguments after `--`. The generated
+server uses `BIND_ADDRESS` for its port; it does not parse `--port` automatically.
+
+Watched extensions: rs, toml, json, yaml, yml, sql, html, css, js, ts, graphql;
+also `Cargo.lock`, `.env`, and `.env.*`. Explicit files can have any extension.
+Build output, VCS directories, node_modules, dist, build, and editor directories
+are excluded. The resolved Cargo target directory is excluded even when customized.
+Nested symlinks are skipped; additional paths must exist at startup.
+
+Unix shutdown signals the process group, waits up to five seconds, then kills
+remaining processes. Windows uses `taskkill /T /F`. Application stdin is closed.
+Reload restarts the process and resets in-memory state; browser live refresh is
+not included. This command is available starting with CLI 0.1.7.

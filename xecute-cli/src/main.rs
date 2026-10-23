@@ -1,5 +1,6 @@
 //! NestJS-style project and resource generation commands.
 
+mod dev;
 mod generate;
 
 use std::{env, path::PathBuf};
@@ -8,7 +9,7 @@ fn run() -> Result<(), String> {
     let mut args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() || matches!(args[0].as_str(), "--help" | "-h" | "help") {
         println!(
-            "Xecute — Rust modules, controllers and injectable services\n\n  xecute new <project> [--mvc | --cqrs] [--runtime-path <cli/xecute>]\n  xecute generate <resource|module|controller|service> <name>\n  xecute g <res|mo|co|s> <name>\n\nNew projects use MVC by default; --cqrs selects command/query handlers. Run generate from a project created with xecute new. Resources include a GET endpoint; individual generators create standalone building blocks."
+            "Xecute — Rust modules, controllers and injectable services\n\n  xecute new <project> [--mvc | --cqrs] [--runtime-path <cli/xecute>]\n  xecute run dev [--bin <name>] [--watch <path>] [-- <app arguments>]\n  xecute generate <resource|module|controller|service> <name>\n  xecute g <res|mo|co|s> <name>\n\nNew projects use MVC by default; --cqrs selects command/query handlers. Run generate from a project created with xecute new. Resources include a GET endpoint; individual generators create standalone building blocks."
         );
         return Ok(());
     }
@@ -51,6 +52,12 @@ fn run() -> Result<(), String> {
                 }
             }
             generate::new_project(&project, runtime.as_deref(), architecture)
+        }
+        "run" if args.first().is_some_and(|arg| arg == "dev") => {
+            dev::run(dev::Options::parse(&args[1..])?)
+        }
+        "run" => {
+            Err("usage: xecute run dev [--bin <name>] [--watch <path>] [-- <app arguments>]".into())
         }
         "generate" | "g" if args.len() == 2 => generate::component(
             &env::current_dir().map_err(|e| e.to_string())?,

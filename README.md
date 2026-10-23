@@ -12,6 +12,7 @@ use an injectable repository and validated request DTOs.
 - [Release status](#release-status)
 - [Installation and quick start](#installation-and-quick-start)
 - [CLI reference](#cli-reference)
+- [Development server and hot reload](#development-server-and-hot-reload)
 - [Project structure](#project-structure)
 - [MVC and CQRS](#mvc-and-cqrs)
 - [Controllers and routing](#controllers-and-routing)
@@ -29,14 +30,13 @@ use an injectable repository and validated request DTOs.
 
 ## Release status
 
-Published packages are `xecute-cli 0.1.6`, `xecute 0.1.4`, and `xmacros 0.1.4`.
+Published packages are `xecute-cli 0.1.7`, `xecute 0.1.5`, and `xmacros 0.1.5`.
 MVC is the default; CQRS is selected with `--cqrs`.
 
-**The middleware decorators, `Application` builder, and generated
-`src/middleware.rs` hook documented below are implemented in this working tree
-but have not been published to crates.io.** Use the local CLI and local runtime
-instructions below to try them. Installing the published CLI alone does not
-provide these additions.
+This release includes `xecute run dev` with automatic development rebuild/restart,
+app/controller/route middleware, the `Application` builder, and the generated
+`src/middleware.rs` configuration hook. Middleware requires runtime/macros 0.1.5
+or later; the dev runner requires CLI 0.1.7 or later.
 
 ## Installation and quick start
 
@@ -47,9 +47,9 @@ Use a Rust installation with Cargo, rustfmt, and Clippy.
 Install the published CLI:
 
 ```sh
-cargo install xecute-cli --version 0.1.6 --locked
+cargo install xecute-cli --version 0.1.7 --locked
 # Update an existing installation:
-cargo install xecute-cli --version 0.1.6 --locked --force
+cargo install xecute-cli --version 0.1.7 --locked --force
 ```
 
 Create and run an MVC application:
@@ -58,7 +58,8 @@ Create and run an MVC application:
 xecute new my-app
 cd my-app
 cp .env.example .env
-cargo run
+xecute run dev
+# Single run without watching: cargo run
 ```
 
 The application starts at `http://127.0.0.1:3000` with these endpoints:
@@ -83,8 +84,8 @@ The initial collection is empty. A successful POST returns `201` with a generate
 UUID and the stored name. Later GET requests return the created records. Storage
 is in memory and resets when the process restarts.
 
-To use the latest local implementation, including middleware, run the following
-from this repository checkout with the middleware changes present:
+To develop against this repository checkout, install its CLI and select its
+local runtime:
 
 ```sh
 cargo install --path xecute-cli --locked --force
@@ -102,6 +103,7 @@ switch which CLI binary is running; install the local CLI as shown above.
 
 ```text
 xecute new <project> [--mvc | --cqrs] [--runtime-path <path>]
+xecute run dev [--bin <name>] [--watch <path>] [-- <app arguments>]
 xecute generate <resource|module|controller|service> <name>
 xecute g <res|mo|co|s> <name>
 xecute --help
@@ -113,6 +115,7 @@ xecute --version
 | `xecute new my-app` | MVC application with a working example resource |
 | `xecute new my-app --mvc` | Explicit MVC selection |
 | `xecute new my-app --cqrs` | Application with command/query handlers |
+| `xecute run dev` | Rebuild and restart the debug application when watched files change |
 | `xecute g resource user` or `xecute g res user` | Resource, module registration, routes, schemas, repository, and HTTP test |
 | `xecute g module billing` or `xecute g mo billing` | Registered module with an empty provider list |
 | `xecute g controller status` or `xecute g co status` | Standalone injectable controller with a GET endpoint |
@@ -135,6 +138,65 @@ Changing the file changes future generation, not existing feature code.
 Keep the `// xecute:` registration markers in `src/app_module.rs`. Generators
 use them to add module imports, container definitions, routes, and API metadata.
 
+## Development server and hot reload
+
+With CLI 0.1.7 or later installed, run this from your application's directory:
+
+```sh
+xecute run dev
+```
+
+The CLI starts `cargo run` in the debug profile and monitors project files. Saving
+source or configuration changes automatically stops the previous process, rebuilds,
+and restarts the application. It uses Cargo's incremental build cache; there is
+no separate watcher executable to install.
+
+```sh
+# Choose a binary in a project with several binary targets:
+xecute run dev --bin server
+
+# Also watch a local runtime or another source directory (repeatable):
+xecute run dev --watch ../xecute/xecute --watch ../xecute/xmacros
+
+# Pass arguments to the application, preserving individual argument boundaries:
+xecute run dev -- --port 4000
+```
+
+The application must implement any arguments passed after `--`; the generated
+server configures its port with `BIND_ADDRESS` instead.
+
+The watcher polls file metadata every 200 ms and groups edits with a 300 ms quiet
+period. It detects additions, changes, removals, and rename-save operations for
+Rust, TOML, JSON, YAML, SQL, HTML, CSS, JavaScript, TypeScript, and GraphQL files,
+plus `Cargo.lock`, `.env`, and `.env.*`. An explicitly watched file can have any
+extension. Additional watch paths must exist when the command starts. Files in
+symlinked subdirectories are not followed; pass a real path with `--watch` if needed.
+
+Cargo's resolved target directory is excluded, including custom
+`CARGO_TARGET_DIR` settings. Directories named `target`, `.git`, `.hg`, `.svn`,
+`node_modules`, `dist`, `build`, `.idea`, and `.vscode` are also excluded. Runtime
+logs and ordinary data files are not watched unless their extension is in the
+list above or they are explicitly selected. Keep generated JSON/configuration
+output outside the watched source tree to avoid restart loops.
+
+Compiler diagnostics and application logs remain visible in the terminal. A
+failed build or exited app leaves the watcher running; saving another change
+retries it. An edit during compilation cancels the old process before starting
+the next build. If the project has multiple runnable binaries, select one with
+`--bin`. Dependencies outside the project tree need explicit `--watch` paths.
+
+Ctrl-C stops the watcher and its managed Cargo/application processes. On Unix,
+restarts and shutdown send SIGTERM to the process group, allow up to five seconds
+for cleanup, then force termination if necessary. On Windows, the process tree
+is terminated with `taskkill /T /F`. Dev shutdown can therefore be shorter than
+the generated server's normal production drain deadline. Application stdin is
+closed; this command is intended for development servers, not interactive programs.
+
+This is **rebuild-and-restart hot reload**: it restarts the server process, resets
+in-memory data, and does not automatically refresh the browser or patch a running
+process. Use `cargo run` for a single run and `cargo build --release --locked`
+for a production binary. Hot reload runs only when explicitly using `xecute run dev`.
+
 ## Project structure
 
 A generated MVC project contains:
@@ -154,7 +216,7 @@ my-app/
 └── src/
     ├── main.rs
     ├── app_module.rs
-    ├── middleware.rs           # Latest local generator: global middleware hook
+    ├── middleware.rs           # Global middleware hook
     ├── configs/               # Validated environment settings
     ├── server/
     │   ├── bootstrap.rs       # Listener and graceful shutdown
@@ -432,7 +494,7 @@ generated controller routing does not create request containers automatically.
 
 ## Middleware
 
-This section requires the latest local runtime and CLI; see [release status](#release-status).
+This section requires runtime/macros 0.1.5 or later; see [release status](#release-status).
 
 Middleware functions accept `Request` and `Next` from `xecute::middleware` and
 return a response or another `IntoResponse` value. Call `next.run(request).await`
@@ -441,7 +503,7 @@ execution.
 
 ### App-level middleware
 
-The local generator creates `src/middleware.rs`. Replace its default configuration
+The generator creates `src/middleware.rs`. Replace its default configuration
 with a middleware registration, for example:
 
 ```rust
@@ -742,8 +804,8 @@ existing applications automatically.
 
 | Symptom | What to check |
 | --- | --- |
-| Installed CLI lacks middleware support | Install the local CLI and select the local runtime; the new API is not yet published |
-| Generated app cannot find `Application` | Its runtime must include the local middleware implementation, not only published `0.1.4` |
+| Installed CLI lacks `run dev` or middleware support | Update to CLI 0.1.7 or later and use runtime/macros 0.1.5 or later |
+| Generated app cannot find `Application` | Update its runtime/macros to 0.1.5 or later |
 | Locked build says the lockfile must change | Run `cargo generate-lockfile`, review it, and commit the result |
 | Generator cannot register a resource | Run from the project root and retain the `// xecute:` markers in `app_module.rs` |
 | Resource already exists | Choose another feature name or edit the existing feature; generators do not overwrite it |
