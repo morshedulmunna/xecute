@@ -1,6 +1,6 @@
 # xecute
 
-A NestJS-inspired Rust framework for Axum with dependency injection, modules,
+A Rust framework for Axum with dependency injection, modules,
 automatic request validation, MVC and CQRS scaffolding, and scoped HTTP middleware.
 
 Xecute keeps HTTP controllers thin. MVC resources delegate to an injectable

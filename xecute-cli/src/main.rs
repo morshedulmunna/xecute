@@ -1,4 +1,4 @@
-//! NestJS-style project and resource generation commands.
+//! Xecute project and resource generation commands.
 
 mod dev;
 mod generate;
