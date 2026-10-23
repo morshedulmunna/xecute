@@ -3,7 +3,7 @@
 Install from the repository root:
 
 ```sh
-cargo install --path cli/xecute-cli
+cargo install --path xecute-cli
 xecute new my-api
 cd my-api
 xecute g resource user
@@ -42,8 +42,8 @@ No `#[path]` annotations are generated. Existing component folders are never
 overwritten. Run generation from the project root. Automatic registration uses
 the comments in `app_module.rs`; keep these markers when editing that file.
 
-Generated projects use `xecute = "0.1.3"` from crates.io by default.
-Use `xecute new my-api --runtime-path /path/to/cli/xecute` for local development.
+Generated projects use `xecute = "0.1.4"` from crates.io by default.
+Use `xecute new my-api --runtime-path /path/to/xecute/xecute` for local development.
 
 Generated CQRS resource folders contain `module.rs`, `controller.rs`,
 `commands/create.rs`, `queries/list.rs`, `dto/`, `entity/`, and `repository/`.

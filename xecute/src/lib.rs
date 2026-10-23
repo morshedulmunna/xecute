@@ -251,16 +251,15 @@ impl Container {
         if definition.scope == Scope::Request {
             return Err(InjectError::Missing(key.name));
         }
-        if definition.scope == Scope::Singleton {
-            if let Some(value) = self
+        if definition.scope == Scope::Singleton
+            && let Some(value) = self
                 .singletons
                 .lock()
                 .map_err(|_| InjectError::Poisoned)?
                 .get(&key)
                 .cloned()
-            {
-                return Ok(value);
-            }
+        {
+            return Ok(value);
         }
         let value = (definition.factory)(self)?;
         if definition.scope == Scope::Singleton {
@@ -359,13 +358,14 @@ fn validate_provider_scopes(
 ) -> Result<(), InjectError> {
     for provider in providers.values() {
         for dependency in &provider.dependencies {
-            if let Some(dependency) = providers.get(dependency) {
-                if provider.scope == Scope::Singleton && dependency.scope == Scope::Request {
-                    return Err(InjectError::InvalidScopeDependency {
-                        owner: provider.key.name,
-                        dependency: dependency.key.name,
-                    });
-                }
+            if let Some(dependency) = providers.get(dependency)
+                && provider.scope == Scope::Singleton
+                && dependency.scope == Scope::Request
+            {
+                return Err(InjectError::InvalidScopeDependency {
+                    owner: provider.key.name,
+                    dependency: dependency.key.name,
+                });
             }
         }
     }

@@ -154,7 +154,7 @@ pub fn new_project(name: &str, runtime: Option<&Path>, architecture: Architectur
             .replace('"', "\\\"");
         format!("xecute = {{ path = \"{runtime}\" }}")
     } else {
-        "xecute = \"0.1.3\"".to_owned()
+        "xecute = \"0.1.4\"".to_owned()
     };
     fs::create_dir_all(root.join("src")).map_err(|e| e.to_string())?;
     write(
@@ -514,9 +514,10 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
                         .split_once('=')
                         .is_some_and(|(key, _)| key.trim() == "xecute")
                     {
-                        line.replace("\"0.1.0\"", "\"0.1.3\"")
-                            .replace("\"0.1.1\"", "\"0.1.3\"")
-                            .replace("\"0.1.2\"", "\"0.1.3\"")
+                        line.replace("\"0.1.0\"", "\"0.1.4\"")
+                            .replace("\"0.1.1\"", "\"0.1.4\"")
+                            .replace("\"0.1.2\"", "\"0.1.4\"")
+                            .replace("\"0.1.3\"", "\"0.1.4\"")
                     } else {
                         line.to_owned()
                     }

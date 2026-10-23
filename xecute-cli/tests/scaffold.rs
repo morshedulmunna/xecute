@@ -54,7 +54,7 @@ fn new_project_is_formatted_locked_and_accepts_resources() {
     assert!(dockerfile.contains("aarch64-unknown-linux-musl"));
     assert!(dockerfile.contains("USER 65532:65532"));
     assert!(!dockerfile.contains("curl"));
-    assert!(manifest.contains("xecute = \"0.1.3\""));
+    assert!(manifest.contains("xecute = \"0.1.4\""));
     assert!(!manifest.contains("path ="));
     assert!(
         Command::new(binary)

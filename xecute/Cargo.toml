@@ -1,12 +1,12 @@
 [package]
 name = "xecute"
-version = "0.1.3"
+version = "0.1.4"
 edition.workspace = true
 rust-version.workspace = true
 description = "Nest-style modules and dependency injection for Axum"
 license.workspace = true
-repository = "https://github.com/xecuteai/xecuteai"
-homepage = "https://github.com/xecuteai/xecuteai"
+repository = "https://github.com/morshedulmunna/xecute"
+homepage = "https://github.com/morshedulmunna/xecute"
 documentation = "https://docs.rs/xecute"
 readme = "README.md"
 keywords = ["dependency-injection", "axum", "modules"]
@@ -18,7 +18,7 @@ schemars = "1.2"
 serde_json = "1"
 validator = { version = "0.20", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
-xmacros = { version = "0.1.3", path = "../xmacros" }
+xmacros = { version = "0.1.4", path = "../xmacros" }
 
 [lints]
 workspace = true

@@ -149,12 +149,11 @@ fn inner_dependency_type(ty: &Type) -> Type {
     let Some(segment) = path.path.segments.last() else {
         return ty.clone();
     };
-    if segment.ident == "Arc" || segment.ident == "Option" {
-        if let syn::PathArguments::AngleBracketed(arguments) = &segment.arguments {
-            if let Some(syn::GenericArgument::Type(inner)) = arguments.args.first() {
-                return inner_dependency_type(inner);
-            }
-        }
+    if (segment.ident == "Arc" || segment.ident == "Option")
+        && let syn::PathArguments::AngleBracketed(arguments) = &segment.arguments
+        && let Some(syn::GenericArgument::Type(inner)) = arguments.args.first()
+    {
+        return inner_dependency_type(inner);
     }
     ty.clone()
 }

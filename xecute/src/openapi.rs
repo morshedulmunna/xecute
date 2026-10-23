@@ -46,10 +46,10 @@ fn normalize_schema(
     fn rewrite(value: &mut Value) {
         match value {
             Value::Object(object) => {
-                if let Some(Value::String(reference)) = object.get_mut("$ref") {
-                    if let Some(name) = reference.strip_prefix("#/$defs/") {
-                        *reference = format!("#/components/schemas/{name}");
-                    }
+                if let Some(Value::String(reference)) = object.get_mut("$ref")
+                    && let Some(name) = reference.strip_prefix("#/$defs/")
+                {
+                    *reference = format!("#/components/schemas/{name}");
                 }
                 for value in object.values_mut() {
                     rewrite(value);

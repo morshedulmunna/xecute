@@ -196,15 +196,14 @@ fn generate(
             continue;
         };
         let receiver = method.sig.receiver().is_some();
-        if let Some(receiver) = method.sig.receiver() {
-            if !matches!(&receiver.kind, syn::ReceiverKind::Reference(_, _, None))
-                || receiver.mutability.is_some()
-            {
-                return Err(syn::Error::new_spanned(
-                    receiver,
-                    "controller handlers require &self",
-                ));
-            }
+        if let Some(receiver) = method.sig.receiver()
+            && (!matches!(&receiver.kind, syn::ReceiverKind::Reference(_, _, None))
+                || receiver.mutability.is_some())
+        {
+            return Err(syn::Error::new_spanned(
+                receiver,
+                "controller handlers require &self",
+            ));
         }
         let mut inputs = Vec::new();
         let mut calls = Vec::new();
