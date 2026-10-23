@@ -2,6 +2,7 @@
 
 mod dev;
 mod generate;
+mod manage;
 
 use std::{env, path::PathBuf};
 
@@ -9,7 +10,7 @@ fn run() -> Result<(), String> {
     let mut args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() || matches!(args[0].as_str(), "--help" | "-h" | "help") {
         println!(
-            "Xecute — Rust modules, controllers and injectable services\n\n  xecute new <project> [--mvc | --cqrs] [--runtime-path <cli/xecute>]\n  xecute run dev [--bin <name>] [--watch <path>] [-- <app arguments>]\n  xecute generate <resource|module|controller|service> <name>\n  xecute g <res|mo|co|s> <name>\n\nNew projects use MVC by default; --cqrs selects command/query handlers. Run generate from a project created with xecute new. Resources include a GET endpoint; individual generators create standalone building blocks."
+            "Xecute — Rust modules, controllers and injectable services\n\n  xecute new <project|.> [--name <package-name>] [--mvc | --cqrs] [--runtime-path <cli/xecute>]\n  xecute update\n  xecute uninstall\n  xecute run dev [--bin <name>] [--watch <path>] [-- <app arguments>]\n  xecute generate <resource|module|controller|service> <name>\n  xecute g <res|mo|co|s> <name>\n\nNew projects use MVC by default; --cqrs selects command/query handlers. Run generate from a project created with xecute new. Resources include a GET endpoint; individual generators create standalone building blocks."
         );
         return Ok(());
     }
@@ -22,12 +23,13 @@ fn run() -> Result<(), String> {
         "new" => {
             if args.is_empty() {
                 return Err(
-                    "usage: xecute new <project> [--mvc | --cqrs] [--runtime-path <cli/xecute>]"
+                    "usage: xecute new <project|.> [--name <package-name>] [--mvc | --cqrs] [--runtime-path <cli/xecute>]"
                         .into(),
                 );
             }
             let project = args.remove(0);
             let mut runtime = None;
+            let mut name_override = None;
             let mut architecture = generate::Architecture::Mvc;
             let mut architecture_seen = false;
             let mut flags = args.into_iter();
@@ -41,6 +43,14 @@ fn run() -> Result<(), String> {
                         architecture = generate::Architecture::Cqrs;
                         architecture_seen = true;
                     }
+                    "--name" if name_override.is_none() => {
+                        name_override = Some(
+                            flags
+                                .next()
+                                .filter(|value| !value.starts_with('-') && !value.is_empty())
+                                .ok_or("--name requires a package name")?,
+                        );
+                    }
                     "--runtime-path" if runtime.is_none() => {
                         let path = flags
                             .next()
@@ -51,8 +61,16 @@ fn run() -> Result<(), String> {
                     _ => return Err(format!("unknown or duplicate option: {flag}")),
                 }
             }
-            generate::new_project(&project, runtime.as_deref(), architecture)
+            generate::new_project(
+                &project,
+                runtime.as_deref(),
+                architecture,
+                name_override.as_deref(),
+            )
         }
+        "update" if args.is_empty() => manage::run(manage::Action::Update),
+        "uninstall" if args.is_empty() => manage::run(manage::Action::Uninstall),
+        "update" | "uninstall" => Err(format!("usage: xecute {command}")),
         "run" if args.first().is_some_and(|arg| arg == "dev") => {
             dev::run(dev::Options::parse(&args[1..])?)
         }

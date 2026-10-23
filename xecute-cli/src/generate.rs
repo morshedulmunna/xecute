@@ -134,11 +134,36 @@ fn format_files(root: &Path, paths: &[String]) -> Result<()> {
     Ok(())
 }
 
-pub fn new_project(name: &str, runtime: Option<&Path>, architecture: Architecture) -> Result<()> {
-    names(name)?;
-    let root = PathBuf::from(name);
-    if root.exists() {
-        return Err(format!("{} already exists", root.display()));
+pub fn new_project(
+    destination: &str,
+    runtime: Option<&Path>,
+    architecture: Architecture,
+    name_override: Option<&str>,
+) -> Result<()> {
+    let in_place = destination == ".";
+    let root = if in_place {
+        std::env::current_dir().map_err(|e| e.to_string())?
+    } else {
+        names(destination)?;
+        PathBuf::from(destination)
+    };
+    let derived_name = if in_place {
+        root.file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("")
+            .to_owned()
+    } else {
+        destination.to_owned()
+    };
+    let name = name_override.unwrap_or(&derived_name);
+    names(name).map_err(|error| {
+        format!("{error}; use --name <project-name> to choose the package name")
+    })?;
+    if !in_place && root.exists() {
+        return Err(format!(
+            "{} already exists; use xecute new . inside that directory",
+            root.display()
+        ));
     }
     let dependency = if let Some(runtime) = runtime {
         let runtime = runtime
@@ -156,21 +181,7 @@ pub fn new_project(name: &str, runtime: Option<&Path>, architecture: Architectur
     } else {
         "xecute = \"0.1.5\"".to_owned()
     };
-    fs::create_dir_all(root.join("src")).map_err(|e| e.to_string())?;
-    write(
-        &root.join("Cargo.toml"),
-        &include_str!("../templates/Cargo.toml.tmpl")
-            .replace("__PROJECT_NAME__", name)
-            .replace("__RUNTIME_DEPENDENCY__", &dependency),
-    )?;
-    fs::create_dir(root.join(".xecute")).map_err(|e| e.to_string())?;
-    write(
-        &root.join(".xecute/architecture"),
-        &format!("{}\n", architecture.name()),
-    )?;
-    write(&root.join(".gitignore"), "/target/\n.env\n")?;
-    let mut formatted = Vec::new();
-    for (path, template) in [
+    let templates = [
         ("src/main.rs", include_str!("../templates/main.rs")),
         (
             "src/middleware.rs",
@@ -296,7 +307,60 @@ pub fn new_project(name: &str, runtime: Option<&Path>, architecture: Architectur
             ".github/dependabot.yml",
             include_str!("../templates/dependabot.yml"),
         ),
-    ] {
+    ];
+    if in_place {
+        let mut outputs: Vec<&str> = templates.iter().map(|(path, _)| *path).collect();
+        outputs.extend([
+            "Cargo.toml",
+            ".xecute",
+            ".gitignore",
+            "README.md",
+            "src/app_module.rs",
+            "src/example",
+            "src/tests/example.rs",
+        ]);
+        if runtime.is_none() {
+            outputs.push("Cargo.lock");
+        }
+        // Validate every destination before writing anything. Symlinked parents
+        // are rejected so initialization cannot write outside the chosen root.
+        for output in outputs {
+            let path = root.join(output);
+            if path.symlink_metadata().is_ok() {
+                return Err(format!(
+                    "{} already exists; no files changed",
+                    path.display()
+                ));
+            }
+            let mut parent = path.parent();
+            while let Some(path) = parent.filter(|path| *path != root) {
+                if let Ok(metadata) = path.symlink_metadata()
+                    && (!metadata.is_dir() || metadata.file_type().is_symlink())
+                {
+                    return Err(format!(
+                        "{} must be a real directory; no files changed",
+                        path.display()
+                    ));
+                }
+                parent = path.parent();
+            }
+        }
+    }
+    fs::create_dir_all(root.join("src")).map_err(|e| e.to_string())?;
+    write(
+        &root.join("Cargo.toml"),
+        &include_str!("../templates/Cargo.toml.tmpl")
+            .replace("__PROJECT_NAME__", name)
+            .replace("__RUNTIME_DEPENDENCY__", &dependency),
+    )?;
+    fs::create_dir(root.join(".xecute")).map_err(|e| e.to_string())?;
+    write(
+        &root.join(".xecute/architecture"),
+        &format!("{}\n", architecture.name()),
+    )?;
+    write(&root.join(".gitignore"), "/target/\n.env\n")?;
+    let mut formatted = Vec::new();
+    for (path, template) in templates {
         if path.ends_with(".rs") {
             formatted.push(path.to_owned());
         }
@@ -323,8 +387,13 @@ pub fn new_project(name: &str, runtime: Option<&Path>, architecture: Architectur
     formatted.push("src/app_module.rs".into());
     format_files(&root, &formatted)?;
     component(&root, "resource", "example")?;
+    let cd = if in_place {
+        String::new()
+    } else {
+        format!("  cd {destination}\n")
+    };
     println!(
-        "Created {name} ({})\n  cd {name}\n  xecute run dev\n  Swagger: http://127.0.0.1:3000/docs/",
+        "Created {name} ({})\n{cd}  xecute run dev\n  Swagger: http://127.0.0.1:3000/docs/",
         architecture.name()
     );
     Ok(())

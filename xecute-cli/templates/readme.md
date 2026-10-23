@@ -235,3 +235,16 @@ Reload restarts the process, so in-memory repository data resets. Browser refres
 is not automatic. Unix allows five seconds for managed processes to stop before
 forcing termination; Windows terminates the process tree. Use `cargo run` for a
 single run and a release build for production. Hot reload is development-only.
+
+## CLI management
+
+With a CLI version containing the management commands, use `xecute update` to
+install the latest registry CLI and `xecute uninstall` to remove the installed
+CLI. These target the running executable's Cargo installation root and preserve
+this application's files. Updating the CLI does not update this project's runtime
+or regenerate its source. Development/source binaries must be installed through
+Cargo before using self-management commands.
+
+To create another project directly inside a fresh existing directory, run
+`xecute new .`; use `--name my-app` to override its package name or `--cqrs` to
+select CQRS. Existing scaffold files are rejected before any files are written.

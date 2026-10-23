@@ -192,3 +192,109 @@ fn architecture_selection_persists_and_invalid_flags_do_not_create_projects() {
     }
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn initializes_current_directory_and_preflights_all_conflicts() {
+    let root = std::env::temp_dir().join(format!(
+        "xecute-in-place-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    fs::create_dir_all(&root).unwrap();
+    let binary = env!("CARGO_BIN_EXE_xecute");
+    for (name, flags, architecture) in [
+        ("my-app", vec![], "mvc"),
+        ("cqrs-app", vec!["--cqrs"], "cqrs"),
+        ("Invalid Directory", vec!["--name", "valid-app"], "mvc"),
+    ] {
+        let project = root.join(name);
+        fs::create_dir_all(project.join(".git")).unwrap();
+        fs::write(project.join("notes.txt"), "preserve me").unwrap();
+        let output = Command::new(binary)
+            .args(["new", "."])
+            .args(flags)
+            .current_dir(&project)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!String::from_utf8_lossy(&output.stdout).contains("  cd "));
+        assert!(project.join("src/main.rs").is_file());
+        assert!(!project.join("my-app").exists());
+        assert_eq!(
+            fs::read_to_string(project.join("notes.txt")).unwrap(),
+            "preserve me"
+        );
+        assert_eq!(
+            fs::read_to_string(project.join(".xecute/architecture"))
+                .unwrap()
+                .trim(),
+            architecture
+        );
+        let package = if name == "Invalid Directory" {
+            "valid-app"
+        } else {
+            name
+        };
+        assert!(
+            fs::read_to_string(project.join("Cargo.toml"))
+                .unwrap()
+                .contains(&format!("name = \"{package}\""))
+        );
+    }
+    for (index, conflict) in [
+        "README.md",
+        "Cargo.toml",
+        "src/main.rs",
+        "src/tests/example.rs",
+        ".github/workflows/ci.yml",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let project = root.join(format!("conflict-{index}"));
+        fs::create_dir_all(project.join(conflict).parent().unwrap()).unwrap();
+        fs::write(project.join(conflict), "preserve me").unwrap();
+        let output = Command::new(binary)
+            .args(["new", "."])
+            .current_dir(&project)
+            .output()
+            .unwrap();
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("no files changed"));
+        assert_eq!(
+            fs::read_to_string(project.join(conflict)).unwrap(),
+            "preserve me"
+        );
+        assert!(!project.join(".xecute").exists());
+        if conflict != "Cargo.toml" {
+            assert!(!project.join("Cargo.toml").exists());
+        }
+    }
+    #[cfg(unix)]
+    {
+        let project = root.join("symlink-app");
+        let outside = root.join("outside");
+        fs::create_dir_all(&project).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, project.join("src")).unwrap();
+        assert!(
+            !Command::new(binary)
+                .args(["new", "."])
+                .current_dir(&project)
+                .output()
+                .unwrap()
+                .status
+                .success()
+        );
+        assert!(!project.join("Cargo.toml").exists());
+        assert!(fs::read_dir(outside).unwrap().next().is_none());
+    }
+    fs::remove_dir_all(root).unwrap();
+}

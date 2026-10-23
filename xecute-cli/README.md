@@ -30,7 +30,7 @@ Commands:
 - `run dev [--bin <name>] [--watch <path>] [-- <app arguments>]`: run the debug
   application with automatic rebuild/restart on source and configuration changes.
 
-- `new <project> [--mvc | --cqrs] [--runtime-path <path>]`: create an independent Axum project.
+- `new <project|.> [--name <package-name>] [--mvc | --cqrs] [--runtime-path <path>]`: create an independent Axum project.
 - `generate resource <name>` / `g res <name>`: create and register a module,
   controller, DTO, entity, repository, and HTTP test, with a service
   by default or command/query handlers for CQRS projects.
@@ -106,3 +106,31 @@ Unix shutdown signals the process group, waits up to five seconds, then kills
 remaining processes. Windows uses `taskkill /T /F`. Application stdin is closed.
 Reload restarts the process and resets in-memory state; browser live refresh is
 not included. This command is available starting with CLI 0.1.7.
+
+## CLI management and current-directory initialization
+
+The following commands are implemented in the local checkout and await the next
+CLI release:
+
+```sh
+xecute update
+xecute uninstall
+xecute new .
+xecute new . --name my-app --cqrs
+```
+
+Update installs the latest crates.io `xecute-cli` with `--locked --force` into the
+running executable's Cargo installation root. Uninstall removes only that Cargo
+package from the same root, preserving application files and Rust/Cargo itself.
+Both require a Cargo-tracked installation, including custom `--root` installs;
+source executables in `target/debug` must first be installed through Cargo.
+Update replaces local builds with the registry release and does not upgrade app
+dependencies. Windows launches a PowerShell helper after the executable exits;
+Cargo's output reports its result. Unix commands wait and propagate failures.
+
+`new .` scaffolds directly into the current directory. Its basename supplies the
+package name unless `--name` is specified. MVC/CQRS and local runtime options work
+as usual. All generated destinations are checked first; existing scaffold files
+are never overwritten. Unrelated files and `.git` are preserved. Symlinked parent
+directories are rejected. Use a fresh directory or move conflicting files before
+retrying. A named destination also accepts `--name` to choose its package name.

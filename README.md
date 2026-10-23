@@ -12,6 +12,7 @@ use an injectable repository and validated request DTOs.
 - [Release status](#release-status)
 - [Installation and quick start](#installation-and-quick-start)
 - [CLI reference](#cli-reference)
+- [Update and uninstall](#update-and-uninstall)
 - [Development server and hot reload](#development-server-and-hot-reload)
 - [Project structure](#project-structure)
 - [MVC and CQRS](#mvc-and-cqrs)
@@ -37,6 +38,9 @@ This release includes `xecute run dev` with automatic development rebuild/restar
 app/controller/route middleware, the `Application` builder, and the generated
 `src/middleware.rs` configuration hook. Middleware requires runtime/macros 0.1.5
 or later; the dev runner requires CLI 0.1.7 or later.
+
+`xecute update`, `xecute uninstall`, and `xecute new .` are new additions in this
+working tree and await the next CLI release. Install the local CLI to use them.
 
 ## Installation and quick start
 
@@ -102,7 +106,9 @@ switch which CLI binary is running; install the local CLI as shown above.
 ## CLI reference
 
 ```text
-xecute new <project> [--mvc | --cqrs] [--runtime-path <path>]
+xecute new <project|.> [--name <package-name>] [--mvc | --cqrs] [--runtime-path <path>]
+xecute update
+xecute uninstall
 xecute run dev [--bin <name>] [--watch <path>] [-- <app arguments>]
 xecute generate <resource|module|controller|service> <name>
 xecute g <res|mo|co|s> <name>
@@ -113,6 +119,10 @@ xecute --version
 | Command | Result |
 | --- | --- |
 | `xecute new my-app` | MVC application with a working example resource |
+| `xecute new .` | Initialize the current directory using its name as the package name |
+| `xecute new . --name my-app` | Initialize the current directory with an explicit package name |
+| `xecute update` | Install the latest crates.io CLI into the running CLI's Cargo installation root |
+| `xecute uninstall` | Remove the Cargo-installed CLI; application projects are retained |
 | `xecute new my-app --mvc` | Explicit MVC selection |
 | `xecute new my-app --cqrs` | Application with command/query handlers |
 | `xecute run dev` | Rebuild and restart the debug application when watched files change |
@@ -137,6 +147,58 @@ Changing the file changes future generation, not existing feature code.
 
 Keep the `// xecute:` registration markers in `src/app_module.rs`. Generators
 use them to add module imports, container definitions, routes, and API metadata.
+
+## Update and uninstall
+
+For a CLI installed through Cargo:
+
+```sh
+xecute update
+xecute uninstall
+```
+
+`update` runs `cargo install xecute-cli --registry crates-io --locked --force` in
+the same installation root as the running executable. It updates the CLI and
+its templates; it does not edit application dependencies or regenerate existing
+projects. It requires Cargo and access to crates.io. A local/source installation
+is replaced by the published registry version, which may not include unreleased
+local features. Check the release status above before updating a development build.
+
+`uninstall` runs `cargo uninstall xecute-cli` against that same root. It removes
+the installed CLI, including installations created with `cargo install --root`.
+It does not remove application directories, source code, or the Cargo toolchain.
+
+The CLI verifies Cargo's `.crates2.json` installation metadata before invoking
+these commands. Executables run directly from `target/debug` or copied outside a
+registered installation are rejected with guidance to use Cargo directly.
+Unix commands wait for Cargo and report failures. On Windows, a PowerShell helper
+waits for the running executable to exit before starting Cargo; its terminal
+output reports completion or errors after the CLI returns.
+
+To initialize an existing directory without creating a nested folder:
+
+```sh
+mkdir my-api
+cd my-api
+xecute new .
+xecute run dev
+
+# Optional package name, architecture, and local runtime:
+xecute new . --name my-api --cqrs --runtime-path /absolute/path/to/xecute/xecute
+```
+
+The final example is an alternative initialization command for an uninitialized
+directory. The default package name comes from the current directory's basename;
+use `--name` if the basename contains spaces, uppercase letters, or other invalid
+characters. `--name` can also override a named project's Cargo package name.
+MVC remains the default, and `--cqrs` selects CQRS.
+
+In-place generation checks all scaffold destinations before writing. Conflicting
+files such as `Cargo.toml`, `README.md`, or `.gitignore` cause a clear error with
+no scaffold files changed. Move those conflicting files or choose a fresh directory
+before retrying. Unrelated files and an existing `.git` directory are preserved.
+Symlinked scaffold parents are rejected. Generation does not change the shell's
+working directory and does not print an extra `cd` step for `new .`.
 
 ## Development server and hot reload
 
