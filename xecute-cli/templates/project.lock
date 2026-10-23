@@ -1411,9 +1411,9 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "xecute"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "542aed39e117d7174dadaa0cb9533a81eddf2b861214559d94689360d804c23e"
+checksum = "8f23fb60c8e0d8434f17711bacddc0f761963a2aabcf88e432c7b3954d1b2a6d"
 dependencies = [
  "axum",
  "schemars",
