@@ -1405,3 +1405,35 @@ Set `api.versioning_enabled = false` to keep only unversioned aliases. Set
 active. Startup logs include each enabled version's Swagger and OpenAPI URLs.
 The registration pattern is explicit URL versioning; header-based versioning and
 automatic deprecation/sunset behavior are not implied.
+
+## Multiple applications with Cargo workspaces
+
+Workspace scaffolding is available in this checkout. MVC is the default:
+
+```sh
+xecute new my-project --workspace
+cd my-project
+xecute g apps admin
+xecute g apps billing --cqrs
+xecute g apps dashboard --mvc
+cargo build --workspace
+cargo test --workspace
+```
+
+The first application is created at `apps/my-project/`. Each app keeps its own
+configuration, HTTP server, feature modules, and MVC or CQRS architecture.
+Applications share the root `Cargo.lock` and `target/`. New applications inherit
+the workspace architecture; use `--mvc` or `--cqrs` to override it.
+`xecute new my-project --workspace --cqrs` selects CQRS for the workspace.
+
+Run resource generators and the development server inside an app:
+
+```sh
+cd apps/admin
+xecute g resource user
+xecute run dev
+```
+
+Configure distinct bind addresses in the apps' `config/AppConfig.toml` files
+when running them together. See [the CLI workspace guide](xecute-cli/README.md#multiple-applications-in-a-workspace)
+for local runtime paths, container builds, and in-place initialization.

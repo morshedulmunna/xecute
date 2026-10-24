@@ -603,3 +603,44 @@ Set `api.versioning_enabled = false` to keep only unversioned aliases. Set
 active. Startup logs include each enabled version's Swagger and OpenAPI URLs.
 The registration pattern is explicit URL versioning; header-based versioning and
 automatic deprecation/sunset behavior are not implied.
+
+## Multiple applications in a workspace
+
+Create a workspace with an initial app at `apps/<project-name>`:
+
+```sh
+xecute new my-project --workspace --mvc
+# Or: xecute new my-project --workspace --cqrs
+cd my-project
+xecute g apps admin
+xecute g apps worker --cqrs
+xecute g apps dashboard --mvc
+```
+
+`generate apps` is also supported. New apps inherit the workspace architecture
+unless `--mvc` or `--cqrs` is supplied. Each app retains the existing feature
+module layout, configuration, static files, and tests. Generate resources and run
+the development server from the app directory:
+
+```sh
+cd apps/admin
+xecute g resource user
+xecute run dev
+```
+
+Assign different bind addresses in each app's `config/AppConfig.toml` when running
+multiple servers at once. From the workspace root, use `cargo build --workspace`,
+`cargo test --workspace`, or `cargo run -p admin`. Apps share the root `Cargo.lock`
+and `target/`. The CLI refreshes the lockfile when adding an app.
+
+Use `--name` to choose the first app's package name, including with
+`xecute new . --workspace`. `--runtime-path` is supported for both workspace
+creation and `g apps`; apps inherit a workspace's local runtime path by default.
+Run `g apps` from the workspace root. Shared libraries can be added under
+`crates/` and registered in the root workspace's `members` list as needed.
+
+Build an app container using the workspace root as its build context:
+
+```sh
+docker build -f apps/admin/Dockerfile -t admin .
+```

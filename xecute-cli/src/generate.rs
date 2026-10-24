@@ -21,7 +21,7 @@ impl Architecture {
         }
     }
 
-    fn read(root: &Path) -> Result<Self> {
+    pub(crate) fn read(root: &Path) -> Result<Self> {
         match fs::read_to_string(root.join(".xecute/architecture")) {
             Ok(value) => match value.trim() {
                 "cqrs" => Ok(Self::Cqrs),
@@ -140,11 +140,23 @@ pub fn new_project(
     architecture: Architecture,
     name_override: Option<&str>,
 ) -> Result<()> {
+    scaffold(destination, runtime, architecture, name_override, false)
+}
+
+fn scaffold(
+    destination: &str,
+    runtime: Option<&Path>,
+    architecture: Architecture,
+    name_override: Option<&str>,
+    member: bool,
+) -> Result<()> {
     let in_place = destination == ".";
     let root = if in_place {
         std::env::current_dir().map_err(|e| e.to_string())?
     } else {
-        names(destination)?;
+        if !member {
+            names(destination)?;
+        }
         PathBuf::from(destination)
     };
     let derived_name = if in_place {
@@ -386,13 +398,21 @@ pub fn new_project(
         }
     }
     fs::create_dir_all(root.join("src")).map_err(|e| e.to_string())?;
-    write(
-        &root.join("Cargo.toml"),
-        &include_str!("../templates/Cargo.toml.in")
-            .replace("__PROJECT_NAME__", name)
-            .replace("__RUNTIME_DEPENDENCY__", &dependency)
-            .replace("__RUNTIME_TEST_DEPENDENCY__", &test_dependency),
-    )?;
+    let manifest = include_str!("../templates/Cargo.toml.in")
+        .replace("__PROJECT_NAME__", name)
+        .replace("__RUNTIME_DEPENDENCY__", &dependency)
+        .replace("__RUNTIME_TEST_DEPENDENCY__", &test_dependency);
+    let manifest = if member {
+        let mut doc = manifest
+            .parse::<toml_edit::DocumentMut>()
+            .map_err(|e| e.to_string())?;
+        doc.remove("workspace");
+        doc.remove("profile");
+        doc.to_string()
+    } else {
+        manifest
+    };
+    write(&root.join("Cargo.toml"), &manifest)?;
     fs::create_dir(root.join(".xecute")).map_err(|e| e.to_string())?;
     write(
         &root.join(".xecute/architecture"),
@@ -421,7 +441,7 @@ pub fn new_project(
             .replace("__PROJECT_NAME__", name)
             .replace("__ARCHITECTURE__", architecture.name()),
     )?;
-    if runtime.is_none() {
+    if runtime.is_none() && !member {
         write(
             &root.join("Cargo.lock"),
             &include_str!("../templates/project.lock").replace("__PROJECT_NAME__", name),
@@ -430,6 +450,10 @@ pub fn new_project(
     formatted.push("src/app_module.rs".into());
     format_files(&root, &formatted)?;
     component(&root, "resource", "example")?;
+    if member {
+        println!("Created {name} ({})", architecture.name());
+        return Ok(());
+    }
     let cd = if in_place {
         String::new()
     } else {
@@ -437,6 +461,201 @@ pub fn new_project(
     };
     println!(
         "Created {name} ({})\n{cd}  xecute run dev\n  Swagger: http://127.0.0.1:3000/docs/",
+        architecture.name()
+    );
+    Ok(())
+}
+
+/// Create a Cargo workspace with an initial application named after the project.
+pub fn new_workspace(
+    destination: &str,
+    runtime: Option<&Path>,
+    architecture: Architecture,
+    name_override: Option<&str>,
+) -> Result<()> {
+    let root = if destination == "." {
+        std::env::current_dir().map_err(|e| e.to_string())?
+    } else {
+        names(destination)?;
+        let root = PathBuf::from(destination);
+        if root.exists() {
+            return Err("destination already exists; no files changed".into());
+        }
+        root
+    };
+    let name = name_override
+        .or_else(|| root.file_name().and_then(|s| s.to_str()))
+        .ok_or("use --name to choose the initial app name")?;
+    names(name)?;
+    // Check all owned destinations before creating anything in an existing directory.
+    for entry in [
+        "Cargo.toml",
+        "Cargo.lock",
+        "apps",
+        ".xecute",
+        "README.md",
+        ".gitignore",
+        ".github",
+        "rust-toolchain.toml",
+        "rustfmt.toml",
+        "clippy.toml",
+        "deny.toml",
+        ".editorconfig",
+        ".gitattributes",
+        ".dockerignore",
+    ] {
+        if root.join(entry).symlink_metadata().is_ok() {
+            return Err(format!("{entry} already exists; no files changed"));
+        }
+    }
+    let runtime = runtime
+        .map(|p| p.canonicalize().map_err(|e| e.to_string()))
+        .transpose()?;
+    if runtime
+        .as_ref()
+        .is_some_and(|p| !p.join("Cargo.toml").is_file())
+    {
+        return Err("runtime path must contain xecute/Cargo.toml".into());
+    }
+    fs::create_dir_all(root.join(".xecute")).map_err(|e| e.to_string())?;
+    write(&root.join(".xecute/workspace"), "1\n")?;
+    write(&root.join(".xecute/architecture"), architecture.name())?;
+    if let Some(runtime) = &runtime {
+        write(
+            &root.join(".xecute/runtime-path"),
+            runtime.to_str().ok_or("runtime path must be UTF-8")?,
+        )?;
+    }
+    write(
+        &root.join("Cargo.toml"),
+        "[workspace]\nmembers = [\"apps/*\"]\nresolver = \"3\"\n\n[profile.release]\nlto = \"thin\"\ncodegen-units = 1\nstrip = \"symbols\"\n",
+    )?;
+    write(
+        &root.join(".gitignore"),
+        "/target/\n.env\n.env.*\n!.env.example\n**/logs/\n**/storage/\n",
+    )?;
+    write(
+        &root.join("README.md"),
+        &format!(
+            "# {name}\n\nAdd an application: `xecute g apps <app_name> [--mvc | --cqrs]`\n\nRun an application: `cd apps/{name} && xecute run dev`\n\nBuild all applications: `cargo build --workspace`\n"
+        ),
+    )?;
+    add_app(&root, name, Some(architecture), runtime.as_deref())?;
+    let app = root.join("apps").join(name);
+    for file in [
+        "rust-toolchain.toml",
+        "rustfmt.toml",
+        "clippy.toml",
+        "deny.toml",
+        ".editorconfig",
+        ".gitattributes",
+        ".dockerignore",
+    ] {
+        if !root.join(file).exists() {
+            fs::rename(app.join(file), root.join(file)).map_err(|e| e.to_string())?;
+        }
+    }
+    fs::create_dir_all(root.join(".github/workflows")).map_err(|e| e.to_string())?;
+    if !root.join(".github/workflows/ci.yml").exists() {
+        write(
+            &root.join(".github/workflows/ci.yml"),
+            "name: CI\non: [push, pull_request]\npermissions:\n  contents: read\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: rustup show active-toolchain\n      - run: cargo fmt --all -- --check\n      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings\n      - run: cargo test --workspace --all-targets --all-features --locked\n",
+        )?;
+    }
+    Ok(())
+}
+
+/// Add an application to a Xecute workspace, inheriting its architecture by default.
+pub fn add_app(
+    root: &Path,
+    name: &str,
+    architecture: Option<Architecture>,
+    runtime: Option<&Path>,
+) -> Result<()> {
+    names(name)?;
+    if !root.join(".xecute/workspace").is_file() {
+        return Err(
+            "run xecute g apps from a workspace created with xecute new --workspace".into(),
+        );
+    }
+    let manifest = fs::read_to_string(root.join("Cargo.toml")).map_err(|e| e.to_string())?;
+    let manifest = manifest
+        .parse::<toml_edit::DocumentMut>()
+        .map_err(|e| e.to_string())?;
+    let members = manifest
+        .get("workspace")
+        .and_then(|w| w.get("members"))
+        .and_then(toml_edit::Item::as_array)
+        .ok_or("workspace manifest must contain members = [\"apps/*\"]")?;
+    if !members
+        .iter()
+        .any(|member| member.as_str() == Some("apps/*"))
+    {
+        return Err("workspace members must include apps/*; no files changed".into());
+    }
+    let architecture = match architecture {
+        Some(architecture) => architecture,
+        None => Architecture::read(root)?,
+    };
+    let inherited = match fs::read_to_string(root.join(".xecute/runtime-path")) {
+        Ok(path) => Some(PathBuf::from(path.trim())),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(format!("cannot read workspace runtime path: {error}")),
+    };
+    let runtime = runtime.or(inherited.as_deref());
+    let apps = root.join("apps");
+    if apps
+        .symlink_metadata()
+        .is_ok_and(|m| m.file_type().is_symlink() || !m.is_dir())
+    {
+        return Err("apps must be a real directory; no files changed".into());
+    }
+    let destination = apps.join(name);
+    if destination.symlink_metadata().is_ok() {
+        return Err("app already exists; no files changed".into());
+    }
+    fs::create_dir_all(&apps).map_err(|e| e.to_string())?;
+    scaffold(
+        destination.to_str().ok_or("app path must be UTF-8")?,
+        runtime,
+        architecture,
+        Some(name),
+        true,
+    )?;
+    // App-level workflows are not discovered by GitHub; provide workspace-wide checks.
+    fs::remove_dir_all(destination.join(".github")).map_err(|e| e.to_string())?;
+    let docker = fs::read_to_string(destination.join("Dockerfile"))
+        .map_err(|e| e.to_string())?
+        .replace("COPY src ./src", "COPY . .")
+        .replace(
+            "COPY public ./public",
+            &format!("COPY apps/{name}/public ./public"),
+        )
+        .replace(
+            "COPY config ./config",
+            &format!("COPY apps/{name}/config ./config"),
+        )
+        .replace(
+            "cargo build --release",
+            &format!("cargo build -p {name} --release"),
+        );
+    write(&destination.join("Dockerfile"), &docker)?;
+    // Resolve the new member while retaining existing dependency versions.
+    let status = Command::new("cargo")
+        .args(["metadata", "--format-version", "1"])
+        .stdout(std::process::Stdio::null())
+        .current_dir(root)
+        .status()
+        .map_err(|e| e.to_string())?;
+    if !status.success() {
+        return Err(
+            "app created, but workspace lockfile generation failed; run cargo generate-lockfile"
+                .into(),
+        );
+    }
+    println!(
+        "Workspace app ready: {} ({}). Run from workspace root: docker build -f apps/{name}/Dockerfile .",
+        destination.display(),
         architecture.name()
     );
     Ok(())
