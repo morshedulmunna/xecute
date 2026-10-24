@@ -606,6 +606,8 @@ automatic deprecation/sunset behavior are not implied.
 
 ## Multiple applications in a workspace
 
+Available starting with CLI 0.1.14. MVC is the default architecture.
+
 Create a workspace with an initial app at `apps/<project-name>`:
 
 ```sh

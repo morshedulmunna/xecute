@@ -2584,7 +2584,7 @@ dependencies = [
 
 [[package]]
 name = "xecute-cli"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "ctrlc",
  "nix",

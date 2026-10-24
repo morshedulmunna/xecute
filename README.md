@@ -40,7 +40,7 @@ use an injectable repository and validated request DTOs.
 
 ## Release status
 
-Published packages are `xecute-cli 0.1.13`, `xecute 0.1.8`, and `xmacros 0.1.6`.
+Published packages are `xecute-cli 0.1.14`, `xecute 0.1.8`, and `xmacros 0.1.6`.
 MVC is the default; CQRS is selected with `--cqrs`.
 
 This release includes `xecute run dev` with automatic development rebuild/restart,
@@ -60,9 +60,9 @@ Use a Rust installation with Cargo, rustfmt, and Clippy.
 Install the published CLI:
 
 ```sh
-cargo install xecute-cli --version 0.1.13 --locked
+cargo install xecute-cli --version 0.1.14 --locked
 # Update an existing installation:
-cargo install xecute-cli --version 0.1.13 --locked --force
+cargo install xecute-cli --version 0.1.14 --locked --force
 ```
 
 Create and run an MVC application:
@@ -136,6 +136,8 @@ xecute --version
 | `xecute uninstall` | Remove the Cargo-installed CLI; application projects are retained |
 | `xecute new my-app --mvc` | Explicit MVC selection |
 | `xecute new my-app --cqrs` | Application with command/query handlers |
+| `xecute new my-project --workspace` | Cargo workspace with its first MVC application under `apps/` |
+| `xecute g apps admin [--mvc \| --cqrs]` | Add an app from the workspace root; inherit architecture unless overridden |
 | `xecute run dev` | Rebuild and restart the debug application when watched files change |
 | `xecute g resource user` or `xecute g res user` | Resource, module registration, routes, schemas, repository, and HTTP test |
 | `xecute g module billing` or `xecute g mo billing` | Registered module with an empty provider list |
@@ -1408,7 +1410,7 @@ automatic deprecation/sunset behavior are not implied.
 
 ## Multiple applications with Cargo workspaces
 
-Workspace scaffolding is available in this checkout. MVC is the default:
+Workspace scaffolding is available starting with CLI 0.1.14. MVC is the default:
 
 ```sh
 xecute new my-project --workspace

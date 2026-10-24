@@ -7,6 +7,28 @@ created projects and resources.
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-10-24
+
+Packages: `xecute-cli 0.1.14`, unchanged `xecute 0.1.8` and `xmacros 0.1.6`.
+
+### Added
+
+- `xecute new <project|.> --workspace` scaffolds a Cargo workspace with its first
+  application under `apps/`, a shared lockfile, tooling, and workspace CI.
+- `xecute g apps <app_name>` and `xecute generate apps <app_name>` add applications
+  that inherit the workspace architecture, with `--mvc` and `--cqrs` overrides.
+- Workspace applications retain feature modules, application configuration,
+  static files, resource generators, tests, and Dockerfiles built from the
+  workspace root. Local runtime paths can be inherited or overridden.
+- Integration coverage for workspace membership, default MVC, CQRS selection,
+  resource generation, architecture overrides, in-place creation, and conflicts.
+
+### Changed
+
+- MVC remains the default architecture for new projects and workspaces.
+- Resolve newly added workspace members while retaining existing locked
+  dependency versions.
+
 ## [0.1.13] - 2026-10-23
 
 Packages: `xecute-cli 0.1.13`, `xecute 0.1.8`, and unchanged `xmacros 0.1.6`.
