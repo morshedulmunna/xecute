@@ -1,5 +1,9 @@
 # Xecute CLI
 
+Project and resource scaffolding for Xecute, a set of architecture tools and
+macros for Axum applications. Xecute is not a framework; generated applications
+are built on Axum and use Xecute to organize modules, services, and handlers.
+
 Install from the repository root:
 
 ```sh
@@ -410,7 +414,7 @@ never include user input or secrets. Codes accept lowercase ASCII letters,
 digits, and underscores, up to 64 characters. Invalid codes use default details.
 All 5xx errors use safe default messages even if custom text is supplied. Invalid
 success statuses passed to `HttpError::new` become 500. Log an underlying failure
-explicitly before mapping it; the framework does not serialize error Display text.
+explicitly before mapping it; Xecute does not serialize error Display text.
 
 `HttpError` produces a JSON envelope on its own, with an empty request ID when
 there is no request boundary. Generated applications already normalize errors,

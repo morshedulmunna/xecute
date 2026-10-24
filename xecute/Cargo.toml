@@ -1,9 +1,9 @@
 [package]
 name = "xecute"
-version = "0.1.8"
+version = "0.1.9"
 edition.workspace = true
 rust-version.workspace = true
-description = "Modules and dependency injection for Axum"
+description = "Application architecture tools and macros for Axum"
 license.workspace = true
 repository = "https://github.com/morshedulmunna/xecute"
 homepage = "https://github.com/morshedulmunna/xecute"

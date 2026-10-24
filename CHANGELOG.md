@@ -7,6 +7,22 @@ created projects and resources.
 
 ## [Unreleased]
 
+## [0.1.17] - 2026-10-24
+
+Packages: `xecute-cli 0.1.17`, `xecute 0.1.9`, and `xmacros 0.1.7`.
+Runtime and macro releases update documentation and package descriptions only.
+
+### Documentation
+
+- Describe Xecute consistently as application architecture tools and macros built
+  on Axum, rather than a separate framework, across READMEs, generated project
+  documentation, crate descriptions, and crate-level documentation.
+
+### Fixed
+
+- Initialize versioning configuration directly in generated root-route tests so
+  Clippy passes with `--all-targets --all-features -- -D warnings`.
+
 ## [0.1.16] - 2026-10-24
 
 Packages: `xecute-cli 0.1.16`, unchanged `xecute 0.1.8` and `xmacros 0.1.6`.

@@ -1,9 +1,9 @@
 [package]
 name = "xmacros"
-version = "0.1.6"
+version = "0.1.7"
 edition.workspace = true
 rust-version.workspace = true
-description = "Dependency-injection and Axum route macros for Xecute applications"
+description = "Application architecture and dependency-injection macros for Axum"
 license.workspace = true
 repository = "https://github.com/morshedulmunna/xecute"
 homepage = "https://github.com/morshedulmunna/xecute"

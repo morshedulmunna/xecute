@@ -1,4 +1,4 @@
-//! A small, explicit dependency-injection runtime for Axum applications.
+//! Application architecture tools, macros, and a dependency-injection runtime for Axum.
 //!
 //! `Container` owns application providers while `ModuleGraph` verifies module
 //! boundaries before the application starts. The older [`Injector`] API is

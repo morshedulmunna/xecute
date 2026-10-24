@@ -1,8 +1,11 @@
 # xecute
 
-`xecute` is a small dependency-injection runtime and macro facade for Axum applications.
-It provides typed providers, application/request scopes, module metadata, and
-startup validation. It is intentionally independent of any larger framework.
+`xecute` provides architecture tools and macros for applications built on Axum.
+It is not a framework; Axum is the underlying web framework. Use these tools
+alongside Axum to organize your application's architecture.
+
+This crate supplies the dependency-injection runtime and macro facade, including
+typed providers, application/request scopes, module metadata, and startup validation.
 
 ```rust
 use xecute::{Container, Provider, InjectError};
@@ -157,7 +160,7 @@ never include user input or secrets. Codes accept lowercase ASCII letters,
 digits, and underscores, up to 64 characters. Invalid codes use default details.
 All 5xx errors use safe default messages even if custom text is supplied. Invalid
 success statuses passed to `HttpError::new` become 500. Log an underlying failure
-explicitly before mapping it; the framework does not serialize error Display text.
+explicitly before mapping it; Xecute does not serialize error Display text.
 
 `HttpError` produces a JSON envelope on its own, with an empty request ID when
 there is no request boundary. Generated applications already normalize errors,

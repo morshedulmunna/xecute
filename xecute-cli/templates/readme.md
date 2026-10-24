@@ -1,5 +1,8 @@
 # __PROJECT_NAME__
 
+An Axum application organized with Xecute tools and macros. Xecute helps structure
+the application architecture; Axum is the underlying web framework.
+
 ```sh
 # Optional credentials: cp .env.example .env
 xecute run dev
@@ -24,7 +27,7 @@ The generated server validates TOML configuration at startup and provides:
 - A 30-second handler deadline returning 504, and a 1 MiB request body limit
   returning 413. Axum extractors enforce streamed body limits during consumption.
 - Generic JSON error envelopes with request IDs, including validation, routing,
-  overload, timeout, and panic errors. Framework errors are normalized without
+  overload, timeout, and panic errors. HTTP errors are normalized without
   exposing internal details. Customize `server/error.rs` for application error messages.
 - Explicit CORS origin allowlists; cross-origin browser access is disabled by
   default. Credentialed cross-origin access is opt-in through validated configuration.
@@ -505,7 +508,7 @@ never include user input or secrets. Codes accept lowercase ASCII letters,
 digits, and underscores, up to 64 characters. Invalid codes use default details.
 All 5xx errors use safe default messages even if custom text is supplied. Invalid
 success statuses passed to `HttpError::new` become 500. Log an underlying failure
-explicitly before mapping it; the framework does not serialize error Display text.
+explicitly before mapping it; Xecute does not serialize error Display text.
 
 `HttpError` produces a JSON envelope on its own, with an empty request ID when
 there is no request boundary. Generated applications already normalize errors,

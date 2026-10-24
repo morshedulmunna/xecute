@@ -1,6 +1,8 @@
 # xmacros
 
-Implementation crate for the `xecute` runtime and Axum route registration.
+Procedural macros for Xecute's application architecture tools and Axum route
+registration. Xecute adds tools and macros to Axum applications; Axum remains
+the underlying web framework.
 
 ```rust
 use std::sync::Arc;

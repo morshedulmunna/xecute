@@ -315,8 +315,10 @@ async fn root_welcomes_clients_and_only_advertises_enabled_docs() {
 
 #[tokio::test]
 async fn root_omits_version_links_when_versioning_is_disabled() {
-    let mut config = Config::default();
-    config.versioning_enabled = false;
+    let config = Config {
+        versioning_enabled: false,
+        ..Config::default()
+    };
     let response = app(&config).oneshot(request("/", "127.0.0.1")).await.unwrap();
     let body = to_bytes(response.into_body(), 4096).await.unwrap();
     let body: serde_json::Value = serde_json::from_slice(&body).unwrap();

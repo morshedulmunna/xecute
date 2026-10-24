@@ -1,10 +1,10 @@
 [package]
 name = "xecute-cli"
-version = "0.1.16"
+version = "0.1.17"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Project and resource generator for Xecute"
+description = "Project and resource scaffolding for Axum applications with Xecute tools"
 repository = "https://github.com/morshedulmunna/xecute"
 readme = "README.md"
 keywords = ["cli", "axum", "code-generation", "dependency-injection"]

@@ -1,7 +1,11 @@
 # xecute
 
-A Rust framework for Axum with dependency injection, modules,
-automatic request validation, MVC and CQRS scaffolding, and scoped HTTP middleware.
+Xecute is a set of tools and macros that helps structure your application's
+architecture. It is not a framework: everything is built on Axum, an established
+Rust web framework. Use Xecute's tools alongside Axum in your applications.
+
+The tools include dependency injection, modules, automatic request validation,
+MVC and CQRS scaffolding, and scoped HTTP middleware.
 
 Xecute keeps HTTP controllers thin. MVC resources delegate to an injectable
 service; CQRS resources delegate to separate command and query handlers. Both
@@ -40,7 +44,7 @@ use an injectable repository and validated request DTOs.
 
 ## Release status
 
-Published packages are `xecute-cli 0.1.16`, `xecute 0.1.8`, and `xmacros 0.1.6`.
+Published packages are `xecute-cli 0.1.17`, `xecute 0.1.9`, and `xmacros 0.1.7`.
 MVC is the default; CQRS is selected with `--cqrs`.
 
 This release includes `xecute run dev` with automatic development rebuild/restart,
@@ -60,9 +64,9 @@ Use a Rust installation with Cargo, rustfmt, and Clippy.
 Install the published CLI:
 
 ```sh
-cargo install xecute-cli --version 0.1.16 --locked
+cargo install xecute-cli --version 0.1.17 --locked
 # Update an existing installation:
-cargo install xecute-cli --version 0.1.16 --locked --force
+cargo install xecute-cli --version 0.1.17 --locked --force
 ```
 
 Create and run an MVC application:
@@ -1186,7 +1190,7 @@ never include user input or secrets. Codes accept lowercase ASCII letters,
 digits, and underscores, up to 64 characters. Invalid codes use default details.
 All 5xx errors use safe default messages even if custom text is supplied. Invalid
 success statuses passed to `HttpError::new` become 500. Log an underlying failure
-explicitly before mapping it; the framework does not serialize error Display text.
+explicitly before mapping it; Xecute does not serialize error Display text.
 
 `HttpError` produces a JSON envelope on its own, with an empty request ID when
 there is no request boundary. Generated applications already normalize errors,
