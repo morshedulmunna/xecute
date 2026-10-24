@@ -284,6 +284,8 @@ async fn root_welcomes_clients_and_only_advertises_enabled_docs() {
     for enabled in [true, false] {
         let mut config = Config::default();
         config.docs.enabled = enabled;
+        config.static_files.enabled = enabled;
+        config.static_files.mount = "/assets".into();
         let app = app(&config);
         let response = app.clone().oneshot(request("/", "127.0.0.1")).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -292,8 +294,32 @@ async fn root_welcomes_clients_and_only_advertises_enabled_docs() {
         let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(body["status"], "ok");
         assert!(body.get("error").is_none());
+        assert_eq!(body["address"], config.bind_address.to_string());
+        assert_eq!(body["url"], format!("http://{}", config.bind_address));
+        if enabled {
+            assert_eq!(body["openapi"], "/docs/openapi.json");
+            assert_eq!(body["versions"][0]["documentation"], "/docs/v1/");
+            assert_eq!(body["versions"][0]["openapi"], "/docs/v1/openapi.json");
+            assert_eq!(body["static_files"], "/assets");
+        } else {
+            assert!(body["openapi"].is_null());
+            assert!(body["versions"].as_array().unwrap().is_empty());
+            assert!(body["static_files"].is_null());
+        }
+
         if enabled { assert_eq!(body["documentation"], "/docs/"); }
         else { assert!(body["documentation"].is_null()); }
         assert_eq!(app.oneshot(request("/still-missing", "127.0.0.1")).await.unwrap().status(), StatusCode::NOT_FOUND);
     }
+}
+
+#[tokio::test]
+async fn root_omits_version_links_when_versioning_is_disabled() {
+    let mut config = Config::default();
+    config.versioning_enabled = false;
+    let response = app(&config).oneshot(request("/", "127.0.0.1")).await.unwrap();
+    let body = to_bytes(response.into_body(), 4096).await.unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(body["documentation"], "/docs/");
+    assert!(body["versions"].as_array().unwrap().is_empty());
 }

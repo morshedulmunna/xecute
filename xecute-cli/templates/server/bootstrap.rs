@@ -22,28 +22,15 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let app = versions.mount(app)
         .merge(super::docs::router(&config, operations)?)
         .merge(super::docs::versioned_router(&config, &versions)?);
-    let app = super::router(app, &config);
 
     // Bind before announcing readiness; report the actual address assigned by the OS.
     let listener = tokio::net::TcpListener::bind(config.bind_address).await?;
     let address = listener.local_addr()?;
+    let mut config = config;
+    config.bind_address = address;
+    let app = super::router(app, &config);
     let url = local_url(address);
     tracing::info!(address = %address, url = %url, "server listening");
-    if config.docs.enabled {
-        tracing::info!(url = %format!("{url}/docs/"), "Swagger UI available");
-        tracing::info!(url = %format!("{url}/docs/openapi.json"), "OpenAPI document available");
-        for version in versions.versions() {
-            tracing::info!(api_version = version.name(), url = %format!("{url}/docs/{}/", version.name()), "Versioned Swagger UI available");
-            tracing::info!(api_version = version.name(), url = %format!("{url}/docs/{}/openapi.json", version.name()), "Versioned OpenAPI document available");
-        }
-    } else {
-        tracing::info!("Swagger documentation disabled (docs.enabled=false)");
-    }
-
-    if config.static_files.enabled {
-        tracing::info!(url = %format!("{url}{}", config.static_files.mount), "static files available");
-    }
-
     // Notify the serving task when shutdown begins so it can enforce a drain deadline.
     let draining = Arc::new(Notify::new());
     let shutdown_started = draining.clone();
@@ -86,7 +73,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 // Wildcard listener addresses are not browser destinations. Keep the bound port,
 // including an OS-assigned port when server.bind_address uses port zero.
-fn local_url(mut address: std::net::SocketAddr) -> String {
+pub(super) fn local_url(mut address: std::net::SocketAddr) -> String {
     if address.ip().is_unspecified() {
         address.set_ip(if address.is_ipv4() {
             std::net::Ipv4Addr::LOCALHOST.into()

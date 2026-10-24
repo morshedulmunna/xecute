@@ -7,12 +7,26 @@ pub(super) async fn check() -> Json<serde_json::Value> {
     Json(serde_json::json!({ "status": "ok" }))
 }
 
-/// Welcome response for the application root.
-pub(super) async fn welcome(docs_enabled: bool) -> Json<serde_json::Value> {
+/// Discover enabled public endpoints without repeating them in startup logs.
+pub(super) fn welcome(config: &crate::configs::Config) -> Json<serde_json::Value> {
+    let versions = if config.docs.enabled && config.versioning_enabled {
+        vec![serde_json::json!({
+            "version": "v1",
+            "documentation": "/docs/v1/",
+            "openapi": "/docs/v1/openapi.json",
+        })]
+    } else {
+        Vec::new()
+    };
     Json(serde_json::json!({
         "name": env!("CARGO_PKG_NAME"),
         "status": "ok",
         "message": "Welcome to Xecute",
-        "documentation": if docs_enabled { Some("/docs/") } else { None },
+        "address": config.bind_address.to_string(),
+        "url": super::bootstrap::local_url(config.bind_address),
+        "documentation": if config.docs.enabled { Some("/docs/") } else { None },
+        "openapi": if config.docs.enabled { Some("/docs/openapi.json") } else { None },
+        "versions": versions,
+        "static_files": if config.static_files.enabled { Some(config.static_files.mount.as_str()) } else { None },
     }))
 }

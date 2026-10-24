@@ -52,6 +52,14 @@ fn workspace_apps_support_both_architectures() {
                 .get("features")
                 .is_none()
         );
+        assert_eq!(
+            shared["workspace"]["lints"]["rust"]["unsafe_code"].as_str(),
+            Some("forbid")
+        );
+        assert_eq!(
+            shared["workspace"]["lints"]["clippy"]["dbg_macro"].as_str(),
+            Some("deny")
+        );
         let before_shared = fs::read_to_string(workspace.join("Cargo.toml")).unwrap();
         let shared_files = [
             "rust-toolchain.toml",
@@ -128,6 +136,8 @@ fn workspace_apps_support_both_architectures() {
                 .unwrap()
                 .parse()
                 .unwrap();
+            assert_eq!(manifest["lints"]["workspace"].as_bool(), Some(true));
+            assert_eq!(manifest["lints"].as_table().unwrap().len(), 1);
             for section in ["dependencies", "dev-dependencies"] {
                 for (_, dependency) in manifest[section].as_table().unwrap() {
                     assert_eq!(dependency["workspace"].as_bool(), Some(true));

@@ -178,8 +178,9 @@ CLI 0.1.9; existing root-level features are preserved rather than moved.
 
 CLI 0.1.10 generates a welcome JSON response at `GET /` with HTTP 200, the app
 name, status, and a `/docs/` documentation path when Swagger is enabled. Startup
-logs show the actual server, Swagger UI, and OpenAPI URLs. Disabled Swagger is
-reported without links. Other unknown routes retain the normal 404 envelope.
+emits one `server listening` log with the actual address and local URL. `GET /`
+also includes OpenAPI, versioned documentation, and static-file paths according
+to enabled settings. Other unknown routes retain the normal 404 envelope.
 Existing applications require the server changes; CLI updates do not rewrite them.
 
 ## Application configuration
@@ -600,7 +601,7 @@ enabled = true
 
 Set `api.versioning_enabled = false` to keep only unversioned aliases. Set
 `docs.enabled = false` to hide all Swagger/OpenAPI routes while keeping API routes
-active. Startup logs include each enabled version's Swagger and OpenAPI URLs.
+active. `GET /` lists each enabled version's Swagger and OpenAPI paths.
 The registration pattern is explicit URL versioning; header-based versioning and
 automatic deprecation/sunset behavior are not implied.
 

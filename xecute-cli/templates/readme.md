@@ -331,12 +331,12 @@ message, and `documentation: "/docs/"`. With `docs.enabled = false` in `config/A
 404 envelope. The root route is defined in `src/server/router.rs` and can be
 customized there.
 
-Startup logs include the server URL, Swagger UI URL (`/docs/`), and OpenAPI URL
-(`/docs/openapi.json`). The actual bound port is used, including when binding port
-zero. Wildcard bindings are displayed as local loopback URLs; IPv6 addresses are
-bracketed. These are local HTTP URLs; configure the public URL separately when
-running behind a TLS ingress or reverse proxy. Disabled documentation is logged
-without advertising Swagger links.
+Startup emits one `server listening` JSON log with the actual bound address and
+local URL, including when binding port zero. `GET /` exposes the address, URL,
+Swagger and OpenAPI paths, versioned documentation links, and static-file mount.
+Disabled endpoints are null or omitted from the version list. Wildcard bindings
+use loopback URLs and IPv6 addresses are bracketed. Configure public URLs
+separately when running behind a TLS ingress or reverse proxy.
 
 Available starting with CLI 0.1.10. Existing projects need the corresponding
 server changes; updating the CLI does not rewrite them. The runtime crate is unchanged.
@@ -696,6 +696,6 @@ enabled = true
 
 Set `api.versioning_enabled = false` to keep only unversioned aliases. Set
 `docs.enabled = false` to hide all Swagger/OpenAPI routes while keeping API routes
-active. Startup logs include each enabled version's Swagger and OpenAPI URLs.
+active. `GET /` lists each enabled version's Swagger and OpenAPI paths.
 The registration pattern is explicit URL versioning; header-based versioning and
 automatic deprecation/sunset behavior are not implied.

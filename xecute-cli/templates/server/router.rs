@@ -13,7 +13,7 @@ use tower_http::{catch_panic::CatchPanicLayer, cors::CorsLayer, limit::RequestBo
 pub fn router(app: Router, config: &Config) -> Router {
     // Share quota and concurrency state across all requests handled by this router.
     let state = middleware::state(config);
-    let docs_enabled = config.docs.enabled;
+    let welcome = health::welcome(config);
     let app = super::static_files::mount(app, &config.static_files);
 
     // Use the validated environment policy for browser cross-origin requests.
@@ -27,7 +27,7 @@ pub fn router(app: Router, config: &Config) -> Router {
 
     // Register probes and a fallback before layering policies over every route.
     // Requests enter the layers below in reverse order of their registration.
-    let app = app.route("/", get(move || health::welcome(docs_enabled)))
+    let app = app.route("/", get(move || { let welcome = welcome.clone(); async move { welcome } }))
         .route("/health/live", get(health::check))
         .route("/health/ready", get(health::check))
         .fallback(|| async { StatusCode::NOT_FOUND })

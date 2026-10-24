@@ -109,6 +109,19 @@ pub(crate) fn workspace_dependencies(
         .get_mut("workspace")
         .and_then(Item::as_table_like_mut)
         .ok_or("missing [workspace]")?;
+    if let Some(lints) = member.get("lints").cloned() {
+        let inherited = lints.get("workspace").and_then(Item::as_bool) == Some(true);
+        if !inherited {
+            if !workspace.contains_key("lints") {
+                workspace.insert("lints", lints);
+            }
+            let mut inheritance = toml_edit::Table::new();
+            inheritance.insert("workspace", value(true));
+            member["lints"] = Item::Table(inheritance);
+        } else if !workspace.contains_key("lints") {
+            return Err("workspace.lints is missing".into());
+        }
+    }
     if !workspace.contains_key("dependencies") {
         workspace.insert("dependencies", Item::Table(toml_edit::Table::new()));
     }
@@ -253,6 +266,32 @@ xecute = { path = "/runtime", features = ["testing"] }
             doc["workspace"]["dependencies"]["xecute"]["path"].as_str(),
             Some("/replacement")
         );
+    }
+
+    #[test]
+    fn workspace_lints_are_inherited_without_overriding_root_policy() {
+        let input = "[lints.rust]\nunsafe_code = \"forbid\"\nmissing_docs = \"warn\"\n[lints.clippy]\ndbg_macro = \"deny\"\ntodo = \"deny\"\nunimplemented = \"deny\"\n";
+        let (member, root) =
+            workspace_dependencies(input, "[workspace]\nmembers = []\n", false).unwrap();
+        let doc = member.parse::<DocumentMut>().unwrap();
+        assert_eq!(doc["lints"]["workspace"].as_bool(), Some(true));
+        assert_eq!(doc["lints"].as_table().unwrap().len(), 1);
+        let doc = root.parse::<DocumentMut>().unwrap();
+        assert_eq!(
+            doc["workspace"]["lints"]["rust"]["unsafe_code"].as_str(),
+            Some("forbid")
+        );
+        assert_eq!(
+            doc["workspace"]["lints"]["clippy"]["todo"].as_str(),
+            Some("deny")
+        );
+        assert_eq!(
+            workspace_dependencies(&member, &root, false).unwrap(),
+            (member, root.clone())
+        );
+        let customized = root.replace("missing_docs = \"warn\"", "missing_docs = \"deny\"");
+        let (_, after) = workspace_dependencies(input, &customized, false).unwrap();
+        assert_eq!(after, customized);
     }
 
     #[test]

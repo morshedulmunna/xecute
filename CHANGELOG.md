@@ -7,6 +7,21 @@ created projects and resources.
 
 ## [Unreleased]
 
+## [0.1.16] - 2026-10-24
+
+Packages: `xecute-cli 0.1.16`, unchanged `xecute 0.1.8` and `xmacros 0.1.6`.
+
+### Changed
+
+- Emit only the `server listening` startup log. Serve the bound address, local URL,
+  enabled Swagger/OpenAPI and versioned documentation paths, and static mount at
+  `GET /` instead of announcing each endpoint in separate logs.
+
+### Fixed
+
+- Generate shared lint policies in `[workspace.lints]` and only
+  `[lints] workspace = true` in workspace apps, preserving root lint customizations.
+
 ## [0.1.15] - 2026-10-24
 
 Packages: `xecute-cli 0.1.15`, unchanged `xecute 0.1.8` and `xmacros 0.1.6`.
