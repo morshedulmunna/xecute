@@ -95,6 +95,82 @@ pub(crate) fn resource_dependencies(manifest: &str) -> Result<String, String> {
     Ok(document.to_string())
 }
 
+/// Lift dependency sources into the workspace, retaining member-specific features.
+pub(crate) fn workspace_dependencies(
+    manifest: &str,
+    workspace: &str,
+    runtime_override: bool,
+) -> Result<(String, String), String> {
+    let mut member = manifest.parse::<DocumentMut>().map_err(|e| e.to_string())?;
+    let mut root = workspace
+        .parse::<DocumentMut>()
+        .map_err(|e| e.to_string())?;
+    let workspace = root
+        .get_mut("workspace")
+        .and_then(Item::as_table_like_mut)
+        .ok_or("missing [workspace]")?;
+    if !workspace.contains_key("dependencies") {
+        workspace.insert("dependencies", Item::Table(toml_edit::Table::new()));
+    }
+    let shared = workspace
+        .get_mut("dependencies")
+        .and_then(Item::as_table_like_mut)
+        .ok_or("invalid [workspace.dependencies]")?;
+    for section in ["dependencies", "dev-dependencies"] {
+        let Some(dependencies) = member.get_mut(section).and_then(Item::as_table_like_mut) else {
+            continue;
+        };
+        for (key, dependency) in dependencies.iter_mut() {
+            let name = key.get();
+            let inherited = dependency
+                .as_table_like()
+                .and_then(|t| t.get("workspace"))
+                .and_then(Item::as_bool)
+                == Some(true);
+            if !inherited
+                && (!shared.contains_key(name)
+                    || (runtime_override && name == "xecute" && section == "dependencies"))
+            {
+                let mut source = dependency.clone();
+                if let Some(table) = source.as_table_like_mut() {
+                    // These apply at the app level, and optional is forbidden at workspace level.
+                    table.remove("features");
+                    table.remove("optional");
+                }
+                shared.insert(name, source);
+            }
+            if !shared.contains_key(name) {
+                return Err(format!("workspace.dependencies is missing {name}"));
+            }
+            let mut reference = InlineTable::new();
+            reference.insert("workspace", true.into());
+            if let Some(table) = dependency.as_table_like() {
+                for key in ["features", "optional"] {
+                    if let Some(value) = table.get(key).and_then(Item::as_value) {
+                        reference.insert(key, value.clone());
+                    }
+                }
+                // Cargo cannot disable defaults in a member if the workspace enables them.
+                if table.get("default-features").and_then(Item::as_bool) == Some(false)
+                    && shared
+                        .get(name)
+                        .and_then(Item::as_table_like)
+                        .and_then(|t| t.get("default-features"))
+                        .and_then(Item::as_bool)
+                        != Some(false)
+                {
+                    return Err(format!(
+                        "set default-features = false for {name} in workspace.dependencies first"
+                    ));
+                }
+            }
+            reference.fmt();
+            *dependency = Item::Value(Value::InlineTable(reference));
+        }
+    }
+    Ok((member.to_string(), root.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,6 +203,58 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn workspace_sources_are_shared_and_member_features_are_preserved() {
+        let member = r#"
+[dependencies]
+xecute = { path = "/runtime", features = ["custom"] }
+serde = { version = "1", features = ["derive"] }
+[dev-dependencies]
+xecute = { path = "/runtime", features = ["testing"] }
+"#;
+        let root =
+            "[workspace]\nmembers = [\"apps/*\"]\n[workspace.dependencies]\nserde = \"=1.0.228\"\n";
+        let (member, root) = workspace_dependencies(member, root, false).unwrap();
+        let doc = root.parse::<DocumentMut>().unwrap();
+        assert_eq!(
+            doc["workspace"]["dependencies"]["serde"].as_str(),
+            Some("=1.0.228")
+        );
+        assert!(
+            doc["workspace"]["dependencies"]["xecute"]
+                .get("features")
+                .is_none()
+        );
+        let doc = member.parse::<DocumentMut>().unwrap();
+        assert_eq!(
+            doc["dependencies"]["serde"]["workspace"].as_bool(),
+            Some(true)
+        );
+        assert_eq!(
+            doc["dependencies"]["serde"]["features"][0].as_str(),
+            Some("derive")
+        );
+        assert_eq!(
+            doc["dev-dependencies"]["xecute"]["features"][0].as_str(),
+            Some("testing")
+        );
+        assert_eq!(
+            workspace_dependencies(&member, &root, false).unwrap(),
+            (member, root.clone())
+        );
+        let (_, overridden) = workspace_dependencies(
+            "[dependencies]\nxecute = { path = \"/replacement\" }\n",
+            &root,
+            true,
+        )
+        .unwrap();
+        let doc = overridden.parse::<DocumentMut>().unwrap();
+        assert_eq!(
+            doc["workspace"]["dependencies"]["xecute"]["path"].as_str(),
+            Some("/replacement")
+        );
+    }
+
     #[test]
     fn invalid_manifests_and_features_are_rejected() {
         assert!(resource_dependencies("not toml").is_err());

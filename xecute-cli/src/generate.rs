@@ -6,6 +6,24 @@ use std::{
 
 type Result<T> = std::result::Result<T, String>;
 
+// Repository-wide settings are emitted once, at the workspace root.
+const WORKSPACE_FILES: &[(&str, &str)] = &[
+    (
+        "rust-toolchain.toml",
+        include_str!("../templates/rust-toolchain.toml"),
+    ),
+    ("rustfmt.toml", include_str!("../templates/rustfmt.toml")),
+    ("clippy.toml", include_str!("../templates/clippy.toml")),
+    ("deny.toml", include_str!("../templates/deny.toml")),
+    (".editorconfig", include_str!("../templates/editorconfig")),
+    (".gitattributes", include_str!("../templates/gitattributes")),
+    (".dockerignore", include_str!("../templates/dockerignore")),
+    (
+        ".github/dependabot.yml",
+        include_str!("../templates/dependabot.yml"),
+    ),
+];
+
 /// Project generation style, persisted for subsequent resource generators.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Architecture {
@@ -418,12 +436,20 @@ fn scaffold(
         &root.join(".xecute/architecture"),
         &format!("{}\n", architecture.name()),
     )?;
-    write(
-        &root.join(".gitignore"),
-        "/target/\n.env\n.env.*\n!.env.example\n/logs/\n/storage/\n",
-    )?;
+    if !member {
+        write(
+            &root.join(".gitignore"),
+            "/target/\n.env\n.env.*\n!.env.example\n/logs/\n/storage/\n",
+        )?;
+    }
     let mut formatted = Vec::new();
     for (path, template) in templates {
+        if member
+            && (path.starts_with(".github/")
+                || WORKSPACE_FILES.iter().any(|(shared, _)| *shared == path))
+        {
+            continue;
+        }
         if path.ends_with(".rs") {
             formatted.push(path.to_owned());
         }
@@ -449,7 +475,7 @@ fn scaffold(
     }
     formatted.push("src/app_module.rs".into());
     format_files(&root, &formatted)?;
-    component(&root, "resource", "example")?;
+    component_inner(&root, "resource", "example", !member)?;
     if member {
         println!("Created {name} ({})", architecture.name());
         return Ok(());
@@ -541,19 +567,11 @@ pub fn new_workspace(
         ),
     )?;
     add_app(&root, name, Some(architecture), runtime.as_deref())?;
-    let app = root.join("apps").join(name);
-    for file in [
-        "rust-toolchain.toml",
-        "rustfmt.toml",
-        "clippy.toml",
-        "deny.toml",
-        ".editorconfig",
-        ".gitattributes",
-        ".dockerignore",
-    ] {
-        if !root.join(file).exists() {
-            fs::rename(app.join(file), root.join(file)).map_err(|e| e.to_string())?;
-        }
+    for (file, template) in WORKSPACE_FILES {
+        let path = root.join(file);
+        fs::create_dir_all(path.parent().expect("workspace file parent"))
+            .map_err(|e| e.to_string())?;
+        write(&path, template)?;
     }
     fs::create_dir_all(root.join(".github/workflows")).map_err(|e| e.to_string())?;
     if !root.join(".github/workflows/ci.yml").exists() {
@@ -597,6 +615,7 @@ pub fn add_app(
         Some(architecture) => architecture,
         None => Architecture::read(root)?,
     };
+    let runtime_override = runtime.is_some();
     let inherited = match fs::read_to_string(root.join(".xecute/runtime-path")) {
         Ok(path) => Some(PathBuf::from(path.trim())),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
@@ -622,8 +641,17 @@ pub fn add_app(
         Some(name),
         true,
     )?;
-    // App-level workflows are not discovered by GitHub; provide workspace-wide checks.
-    fs::remove_dir_all(destination.join(".github")).map_err(|e| e.to_string())?;
+    centralize_dependencies(&destination, root, runtime_override)?;
+    if runtime_override {
+        let runtime = runtime
+            .expect("explicit runtime")
+            .canonicalize()
+            .map_err(|e| e.to_string())?;
+        write(
+            &root.join(".xecute/runtime-path"),
+            runtime.to_str().ok_or("runtime path must be UTF-8")?,
+        )?;
+    }
     let docker = fs::read_to_string(destination.join("Dockerfile"))
         .map_err(|e| e.to_string())?
         .replace("COPY src ./src", "COPY . .")
@@ -661,7 +689,22 @@ pub fn add_app(
     Ok(())
 }
 
+fn centralize_dependencies(app: &Path, root: &Path, runtime_override: bool) -> Result<()> {
+    let app_path = app.join("Cargo.toml");
+    let root_path = root.join("Cargo.toml");
+    let app_manifest = fs::read_to_string(&app_path).map_err(|e| e.to_string())?;
+    let root_manifest = fs::read_to_string(&root_path).map_err(|e| e.to_string())?;
+    let (app_manifest, root_manifest) =
+        crate::manifest::workspace_dependencies(&app_manifest, &root_manifest, runtime_override)?;
+    write(&root_path, &root_manifest)?;
+    write(&app_path, &app_manifest)
+}
+
 pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
+    component_inner(root, kind, name, true)
+}
+
+fn component_inner(root: &Path, kind: &str, name: &str, inherit_dependencies: bool) -> Result<()> {
     let kind = match kind {
         "resource" | "res" => "resource",
         "module" | "mo" => "module",
@@ -868,6 +911,24 @@ pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
         if manifest_path.exists() {
             let before = fs::read_to_string(&manifest_path).map_err(|e| e.to_string())?;
             let manifest = crate::manifest::resource_dependencies(&before)?;
+            let workspace_root = root
+                .ancestors()
+                .skip(1)
+                .filter(|_| inherit_dependencies)
+                .find(|parent| parent.join(".xecute/workspace").is_file());
+            let manifest = if let Some(workspace_root) = workspace_root {
+                let workspace_path = workspace_root.join("Cargo.toml");
+                let before_workspace =
+                    fs::read_to_string(&workspace_path).map_err(|e| e.to_string())?;
+                let (manifest, workspace) =
+                    crate::manifest::workspace_dependencies(&manifest, &before_workspace, false)?;
+                if workspace != before_workspace {
+                    write(&workspace_path, &workspace)?;
+                }
+                manifest
+            } else {
+                manifest
+            };
             if before != manifest {
                 write(&manifest_path, &manifest)?;
                 println!("Updated resource dependencies; cargo build will refresh Cargo.lock.");

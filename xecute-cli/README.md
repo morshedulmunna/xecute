@@ -608,6 +608,11 @@ automatic deprecation/sunset behavior are not implied.
 
 Available starting with CLI 0.1.14. MVC is the default architecture.
 
+Workspace tooling, Git settings, Docker ignore rules, CI, and Dependabot settings
+are generated once at the root. Apps do not receive duplicate copies of these
+files or their own lockfile. App-specific source, configuration, environment
+examples, Dockerfiles, and documentation stay inside each app.
+
 Create a workspace with an initial app at `apps/<project-name>`:
 
 ```sh
@@ -633,7 +638,12 @@ xecute run dev
 Assign different bind addresses in each app's `config/AppConfig.toml` when running
 multiple servers at once. From the workspace root, use `cargo build --workspace`,
 `cargo test --workspace`, or `cargo run -p admin`. Apps share the root `Cargo.lock`
-and `target/`. The CLI refreshes the lockfile when adding an app.
+and `target/`. Dependency versions and paths live in the root
+`[workspace.dependencies]`; apps use `{ workspace = true }` and retain their
+individual feature selections, including test-only runtime features. Adding apps
+or resources preserves existing shared dependency versions. An explicit
+`g apps --runtime-path` updates the shared runtime path for the workspace.
+The CLI refreshes the lockfile when adding an app.
 
 Use `--name` to choose the first app's package name, including with
 `xecute new . --workspace`. `--runtime-path` is supported for both workspace

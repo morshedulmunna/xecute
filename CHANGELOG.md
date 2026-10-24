@@ -7,6 +7,21 @@ created projects and resources.
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-10-24
+
+Packages: `xecute-cli 0.1.15`, unchanged `xecute 0.1.8` and `xmacros 0.1.6`.
+
+### Changed
+
+- Generate workspace tooling, Git settings, Docker ignore rules, and GitHub
+  configuration once at the root rather than duplicating them in each app.
+
+- Centralize generated workspace dependency versions and paths in the root
+  `[workspace.dependencies]`. Apps inherit dependencies with `workspace = true`,
+  retaining their own feature selections and test-only runtime features.
+- Adding apps and generating resources preserves existing shared dependency
+  definitions. Explicit app runtime paths update the shared workspace runtime.
+
 ## [0.1.14] - 2026-10-24
 
 Packages: `xecute-cli 0.1.14`, unchanged `xecute 0.1.8` and `xmacros 0.1.6`.

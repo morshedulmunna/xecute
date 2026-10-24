@@ -37,6 +37,45 @@ fn workspace_apps_support_both_architectures() {
             String::from_utf8_lossy(&output.stderr)
         );
         let workspace = root.join(&project);
+        let shared = fs::read_to_string(workspace.join("Cargo.toml")).unwrap();
+        let shared: toml_edit::DocumentMut = shared.parse().unwrap();
+        assert_eq!(
+            shared["workspace"]["dependencies"]["axum"].as_str(),
+            Some("0.8")
+        );
+        assert_eq!(
+            shared["workspace"]["dependencies"]["xecute"]["path"].as_str(),
+            runtime.to_str()
+        );
+        assert!(
+            shared["workspace"]["dependencies"]["xecute"]
+                .get("features")
+                .is_none()
+        );
+        let before_shared = fs::read_to_string(workspace.join("Cargo.toml")).unwrap();
+        let shared_files = [
+            "rust-toolchain.toml",
+            "rustfmt.toml",
+            "clippy.toml",
+            "deny.toml",
+            ".editorconfig",
+            ".gitattributes",
+            ".dockerignore",
+            ".gitignore",
+            ".github/workflows/ci.yml",
+            ".github/dependabot.yml",
+        ];
+        let shared_before: Vec<_> = shared_files
+            .iter()
+            .map(|file| fs::read(workspace.join(file)).unwrap())
+            .collect();
+        for file in shared_files {
+            assert!(
+                !workspace.join("apps").join(&project).join(file).exists(),
+                "initial app duplicates {file}"
+            );
+        }
+
         for (app, flag, expected) in [
             ("inherited", None, style),
             (
@@ -85,6 +124,36 @@ fn workspace_apps_support_both_architectures() {
                 app.join("src/modules/user/commands/create.rs").exists(),
                 expected == "cqrs"
             );
+            let manifest: toml_edit::DocumentMut = fs::read_to_string(app.join("Cargo.toml"))
+                .unwrap()
+                .parse()
+                .unwrap();
+            for section in ["dependencies", "dev-dependencies"] {
+                for (_, dependency) in manifest[section].as_table().unwrap() {
+                    assert_eq!(dependency["workspace"].as_bool(), Some(true));
+                    assert!(dependency.get("version").is_none());
+                    assert!(dependency.get("path").is_none());
+                }
+            }
+            assert!(
+                manifest["dev-dependencies"]["xecute"]["features"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|feature| feature.as_str() == Some("testing"))
+            );
+            assert_eq!(
+                fs::read_to_string(workspace.join("Cargo.toml")).unwrap(),
+                before_shared
+            );
+            for (file, before) in shared_files.iter().zip(&shared_before) {
+                assert!(!app.join(file).exists(), "new app duplicates {file}");
+                assert_eq!(
+                    &fs::read(workspace.join(file)).unwrap(),
+                    before,
+                    "shared file was rewritten: {file}"
+                );
+            }
             assert!(!app.join("Cargo.lock").exists());
             assert!(
                 !fs::read_to_string(app.join("Cargo.toml"))

@@ -40,7 +40,7 @@ use an injectable repository and validated request DTOs.
 
 ## Release status
 
-Published packages are `xecute-cli 0.1.14`, `xecute 0.1.8`, and `xmacros 0.1.6`.
+Published packages are `xecute-cli 0.1.15`, `xecute 0.1.8`, and `xmacros 0.1.6`.
 MVC is the default; CQRS is selected with `--cqrs`.
 
 This release includes `xecute run dev` with automatic development rebuild/restart,
@@ -60,9 +60,9 @@ Use a Rust installation with Cargo, rustfmt, and Clippy.
 Install the published CLI:
 
 ```sh
-cargo install xecute-cli --version 0.1.14 --locked
+cargo install xecute-cli --version 0.1.15 --locked
 # Update an existing installation:
-cargo install xecute-cli --version 0.1.14 --locked --force
+cargo install xecute-cli --version 0.1.15 --locked --force
 ```
 
 Create and run an MVC application:
@@ -1424,7 +1424,9 @@ cargo test --workspace
 
 The first application is created at `apps/my-project/`. Each app keeps its own
 configuration, HTTP server, feature modules, and MVC or CQRS architecture.
-Applications share the root `Cargo.lock` and `target/`. New applications inherit
+Applications share the root `Cargo.lock`, `target/`, and dependency definitions
+in `[workspace.dependencies]`. App dependencies use `workspace = true`, with
+features selected per app. New applications inherit
 the workspace architecture; use `--mvc` or `--cqrs` to override it.
 `xecute new my-project --workspace --cqrs` selects CQRS for the workspace.
 
