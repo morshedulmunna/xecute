@@ -7,6 +7,10 @@ created projects and resources.
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-10-27
+
+Packages: `xecute-cli 0.1.19`, unchanged `xecute 0.1.9` and `xmacros 0.1.7`.
+
 ### Changed
 
 - Generate CQRS resources as controller → command/query handler → repository.

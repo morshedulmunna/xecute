@@ -44,7 +44,7 @@ use an injectable repository and validated request DTOs.
 
 ## Release status
 
-Published packages are `xecute-cli 0.1.18`, `xecute 0.1.9`, and `xmacros 0.1.7`.
+Published packages are `xecute-cli 0.1.19`, `xecute 0.1.9`, and `xmacros 0.1.7`.
 MVC is the default; CQRS is selected with `--cqrs`.
 
 This release includes `xecute run dev` with automatic development rebuild/restart,
@@ -64,9 +64,9 @@ Use a Rust installation with Cargo, rustfmt, and Clippy.
 Install the published CLI:
 
 ```sh
-cargo install xecute-cli --version 0.1.18 --locked
+cargo install xecute-cli --version 0.1.19 --locked
 # Update an existing installation:
-cargo install xecute-cli --version 0.1.18 --locked --force
+cargo install xecute-cli --version 0.1.19 --locked --force
 ```
 
 Create and run an MVC application:
