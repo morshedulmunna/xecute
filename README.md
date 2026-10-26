@@ -347,7 +347,7 @@ cd my-api
 xecute g resource user
 ```
 
-Its resource uses command/query handlers and a `services/` directory:
+Its resource uses command/query handlers that inject the repository:
 
 ```text
 src/modules/user/
@@ -360,9 +360,6 @@ src/modules/user/
 ├── queries/
 │   ├── mod.rs
 │   └── list.rs      # ListUserQuery + ListUserHandler
-├── services/
-│   ├── mod.rs
-│   └── user_service.rs
 ├── dto/mod.rs
 ├── entity/mod.rs
 └── repository/
@@ -371,18 +368,19 @@ src/modules/user/
 ```
 
 ```text
-POST → DTO validation → Controller → CreateUserHandler → UserService → Repository write
-GET  → Controller → ListUserHandler → UserService → Repository read
+POST → DTO validation → Controller → CreateUserHandler → Repository write
+GET  → Controller → ListUserHandler → Repository read
 ```
 
 Controllers construct command/query inputs and invoke handlers through direct
-dependency injection. Both handlers inject the same singleton business service
-from `services/user_service.rs`; that service owns shared business rules and
-normalization and injects the repository. The feature module registers and exports
-the service alongside its handlers. MVC keeps its existing `service.rs` layout.
+dependency injection. The command handler coordinates writes and normalizes input;
+the query handler reads records. Both inject the same singleton repository, so
+writes are visible to subsequent reads. The module registers the repository and
+exports its handlers. Add a focused business service when an operation needs
+reusable domain logic. MVC keeps its existing `service.rs` layout.
 
-The CQRS service layer is available starting with CLI 0.1.9. Existing CQRS
-features are preserved; migrate their handlers and DI registrations manually.
+Existing CQRS features are preserved; migrate their handlers and DI registrations
+manually to adopt this layout.
 
 Initial resources implement collection GET and create POST. Update, delete,
 get-by-ID, pagination, and their handlers are application extensions. CQRS does
@@ -948,7 +946,7 @@ Licensed under **Apache-2.0**.
 All newly generated resources and standalone modules, controllers, and services
 live under `src/modules/<feature>/`. Each resource keeps its controller, DI module,
 DTOs, entities, repository, and HTTP tests together. CQRS resources also contain
-commands, queries, and shared services. `src/modules/mod.rs` declares each feature;
+commands and queries. `src/modules/mod.rs` declares each feature;
 `AppModule` imports and mounts it through `crate::modules::<feature>`.
 
 ```text
@@ -962,9 +960,6 @@ src/
 │       ├── controller.rs
 │       ├── commands/
 │       ├── queries/
-│       ├── services/
-│       │   ├── mod.rs
-│       │   └── user_service.rs
 │       ├── dto/
 │       ├── entity/
 │       ├── repository/

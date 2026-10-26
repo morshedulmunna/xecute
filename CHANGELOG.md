@@ -7,6 +7,14 @@ created projects and resources.
 
 ## [Unreleased]
 
+### Changed
+
+- Generate CQRS resources as controller → command/query handler → repository.
+  Handlers inject the shared repository directly; create handlers retain name
+  normalization. Remove the mandatory forwarding service and its registrations.
+  MVC resources retain controller → service → repository. Existing apps are not
+  rewritten automatically.
+
 ## [0.1.18] - 2026-10-27
 
 Packages: `xecute-cli 0.1.18`, unchanged `xecute 0.1.9` and `xmacros 0.1.7`.

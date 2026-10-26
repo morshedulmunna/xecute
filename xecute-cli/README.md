@@ -53,7 +53,7 @@ Generated projects use `xecute = { version = "0.1.8" }` from crates.io by defaul
 Use `xecute new my-api --runtime-path /path/to/xecute/xecute` for local development.
 
 Generated CQRS resource folders contain `module.rs`, `controller.rs`,
-`commands/create.rs`, `queries/list.rs`, `services/<feature>_service.rs`, `dto/`,
+`commands/create.rs`, `queries/list.rs`, `dto/`,
 `entity/`, and `repository/`.
 New projects use MVC with `service.rs` by default.
 Use `xecute new my-api --cqrs` to generate command/query handlers instead.
@@ -61,10 +61,10 @@ Use `xecute new my-api --cqrs` to generate command/query handlers instead.
 The selection is saved in `.xecute/architecture`; commit this file. Subsequent
 resource generation follows that selection. Existing projects without the file
 keep the legacy MVC layout. Invalid configuration stops generation.
-Command and query handlers inject a shared singleton service from `services/`.
-The service contains business operations and injects the repository. The feature
-module registers/exports the service and its handlers. MVC retains `service.rs`.
-The CQRS services directory is available starting with CLI 0.1.9; existing
+Command and query handlers inject the singleton repository directly. Commands
+coordinate writes and normalize input; queries read records. The feature module
+registers the repository and exports its handlers. Add focused business services
+when reusable domain logic needs them. MVC retains `service.rs`. Existing
 features are not rewritten automatically.
 Separate databases, event sourcing, and message buses are optional. The repository is a bounded in-memory
 example; replace it with durable storage before deployment.
@@ -148,7 +148,7 @@ retrying. A named destination also accepts `--name` to choose its package name.
 All newly generated resources and standalone modules, controllers, and services
 live under `src/modules/<feature>/`. Each resource keeps its controller, DI module,
 DTOs, entities, repository, and HTTP tests together. CQRS resources also contain
-commands, queries, and shared services. `src/modules/mod.rs` declares each feature;
+commands and queries. `src/modules/mod.rs` declares each feature;
 `AppModule` imports and mounts it through `crate::modules::<feature>`.
 
 ```text
@@ -162,9 +162,6 @@ src/
 │       ├── controller.rs
 │       ├── commands/
 │       ├── queries/
-│       ├── services/
-│       │   ├── mod.rs
-│       │   └── user_service.rs
 │       ├── dto/
 │       ├── entity/
 │       ├── repository/

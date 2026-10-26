@@ -4,7 +4,7 @@
 //! ```ignore
 //! use crate::modules::auth::AuthModule;
 //! // Add AuthModule to imports below. AuthModule must export AuthService.
-//! // Then add `auth: Arc<AuthService>` to your service/controller.
+//! // Then add `auth: Arc<AuthService>` to a handler or controller.
 //! ```
 //! Register AuthModule::definition() in AppModule::definitions() as well;
 //! generated resources are registered there automatically. Keep each provider in
@@ -13,7 +13,6 @@
 use super::commands::Create__TYPE__Handler;
 use super::queries::List__TYPE__Handler;
 use super::repository::__TYPE__Repository;
-use super::services::__TYPE__Service;
 use super::__TYPE__Controller;
 use xecute::module;
 
@@ -22,8 +21,8 @@ use xecute::module;
     imports = [
         // Other feature modules, e.g. AuthModule (see import guide above).
     ],
-    providers = [__TYPE__Repository, __TYPE__Service, Create__TYPE__Handler, List__TYPE__Handler, __TYPE__Controller],
+    providers = [__TYPE__Repository, Create__TYPE__Handler, List__TYPE__Handler, __TYPE__Controller],
     controllers = [__TYPE__Controller],
-    exports = [__TYPE__Service, Create__TYPE__Handler, List__TYPE__Handler],
+    exports = [Create__TYPE__Handler, List__TYPE__Handler],
 )]
 pub struct __TYPE__Module;

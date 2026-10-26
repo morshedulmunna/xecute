@@ -9,7 +9,7 @@ async fn creation_validates_before_persisting() {
     for (name, expected) in [
         ("ab", StatusCode::UNPROCESSABLE_ENTITY),
         ("   ", StatusCode::UNPROCESSABLE_ENTITY),
-        ("Example", StatusCode::CREATED),
+        ("  Example  ", StatusCode::CREATED),
     ] {
         let _ = app.post("/__FEATURE__").json(&serde_json::json!({"name": name}))
             .send().await.unwrap().assert_status(expected);

@@ -175,7 +175,7 @@ Types keep feature names such as `AuthController`, `AuthService`, and `AuthModul
 Macros are imported once and used as `#[controller]`, `#[injectable]`, and
 `#[module]`; method attributes such as `#[get]` are consumed by `#[controller]`.
 
-Resource generation includes `dto/`, `entity/`, `repository/`, and an HTTP test inside each feature’s `tests/` directory. CQRS projects add `commands/`, `queries/`, and `services/`; MVC projects add `service.rs`. DTOs use `validator` to reject invalid JSON payloads with HTTP 422 before saving. The included repository is bounded in-memory example storage; replace it with a database for durable production data.
+Resource generation includes `dto/`, `entity/`, `repository/`, and an HTTP test inside each feature’s `tests/` directory. CQRS projects add `commands/` and `queries/`; MVC projects add `service.rs`. DTOs use `validator` to reject invalid JSON payloads with HTTP 422 before saving. The included repository is bounded in-memory example storage; replace it with a database for durable production data.
 
 ```sh
 curl -X POST http://localhost:3000/user -H 'content-type: application/json' -d '{"name":"Example"}'
@@ -213,10 +213,10 @@ retain the legacy MVC layout. Invalid configuration stops generation.
 CQRS resources contain `commands/create.rs` and `queries/list.rs`, each with its
 input type and injectable handler. Controllers validate DTOs automatically, map
 them to commands, and invoke handlers through dependency injection. Both handlers
-inject the shared business service in `services/<feature>_service.rs`, which holds
-business operations and injects the singleton repository. The module registers
-and exports the service alongside the handlers. Writes are visible to subsequent
-reads. The flow is controller → command/query handler → service → repository.
+inject the singleton repository directly. Command handlers coordinate writes and
+normalize input; query handlers read records. The module exports the handlers.
+Add focused business services for reusable domain logic when needed. Writes are
+visible to subsequent reads. The flow is controller → command/query handler → repository.
 Separate databases, event sourcing,
 and command/query buses are optional extensions. The initial endpoints are GET
 (collection) and POST (create); add further operations as the feature grows.
@@ -296,7 +296,7 @@ select CQRS. Existing scaffold files are rejected before any files are written.
 All newly generated resources and standalone modules, controllers, and services
 live under `src/modules/<feature>/`. Each resource keeps its controller, DI module,
 DTOs, entities, repository, and HTTP tests together. CQRS resources also contain
-commands, queries, and shared services. `src/modules/mod.rs` declares each feature;
+commands and queries. `src/modules/mod.rs` declares each feature;
 `AppModule` imports and mounts it through `crate::modules::<feature>`.
 
 ```text
@@ -310,9 +310,6 @@ src/
 │       ├── controller.rs
 │       ├── commands/
 │       ├── queries/
-│       ├── services/
-│       │   ├── mod.rs
-│       │   └── user_service.rs
 │       ├── dto/
 │       ├── entity/
 │       ├── repository/

@@ -872,12 +872,7 @@ fn component_inner(root: &Path, kind: &str, name: &str, inherit_dependencies: bo
         }
         files.push(("commands/mod.rs".into(), format!("//! Write operations.\nmod create;\npub use create::{{Create{pascal}Command, Create{pascal}Handler}};\n")));
         files.push(("queries/mod.rs".into(), format!("//! Read operations.\nmod list;\npub use list::{{List{pascal}Query, List{pascal}Handler}};\n")));
-        files.push((
-            format!("services/{snake}_service.rs"),
-            include_str!("../templates/cqrs/service.rs").replace("__TYPE__", &pascal),
-        ));
-        files.push(("services/mod.rs".into(), format!("//! Shared business services for this feature.\nmod {snake}_service;\npub use {snake}_service::{pascal}Service;\n")));
-        mods.push_str("\npub mod commands;\npub mod queries;\npub mod services;\n");
+        mods.push_str("\npub mod commands;\npub mod queries;\n");
     }
     if kind == "resource" {
         files.push((

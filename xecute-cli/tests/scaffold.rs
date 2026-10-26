@@ -171,23 +171,17 @@ fn architecture_selection_persists_and_invalid_flags_do_not_create_projects() {
         for feature in ["example", "user_profile"] {
             let feature = project.join("src/modules").join(feature);
             assert_eq!(feature.join("service.rs").exists(), architecture == "mvc");
-            assert_eq!(
-                feature.join("services/mod.rs").exists(),
-                architecture == "cqrs"
-            );
+            assert!(!feature.join("services").exists());
             if architecture == "cqrs" {
-                let name = feature.file_name().unwrap().to_str().unwrap();
-                let service =
-                    fs::read_to_string(feature.join(format!("services/{name}_service.rs")))
-                        .unwrap();
-                assert!(service.contains("repository: Arc<"));
                 for handler in ["commands/create.rs", "queries/list.rs"] {
                     let handler = fs::read_to_string(feature.join(handler)).unwrap();
-                    assert!(handler.contains("service: Arc<"));
-                    assert!(!handler.contains("repository: Arc<"));
+                    assert!(handler.contains("repository: Arc<"));
+                    assert!(!handler.contains("service: Arc<"));
                 }
                 let module = fs::read_to_string(feature.join("module.rs")).unwrap();
-                assert!(module.contains("Service,"));
+                assert!(!module.contains("use super::services::"));
+                assert!(module.contains("exports = [Create"));
+                assert!(module.contains("Repository,"));
             }
             assert_eq!(
                 feature.join("commands/create.rs").exists(),

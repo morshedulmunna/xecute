@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 use xecute::prelude::*;
-use super::super::{entity::__TYPE__, repository::CapacityExceeded, services::__TYPE__Service};
+use super::super::{entity::__TYPE__, repository::{__TYPE__Repository, CapacityExceeded}};
 
 /// Intent to create a record, constructed after HTTP DTO validation.
 pub struct Create__TYPE__Command {
@@ -10,15 +10,15 @@ pub struct Create__TYPE__Command {
     pub name: String,
 }
 
-/// Executes write requests through the shared business service.
+/// Coordinates writes and applies business normalization before persistence.
 #[derive(Injectable)]
 pub struct Create__TYPE__Handler {
-    service: Arc<__TYPE__Service>,
+    repository: Arc<__TYPE__Repository>,
 }
 
 impl Create__TYPE__Handler {
     /// Persist the requested record.
     pub async fn execute(&self, command: Create__TYPE__Command) -> Result<__TYPE__, CapacityExceeded> {
-        self.service.create(command.name).await
+        self.repository.create(command.name.trim().to_owned()).await
     }
 }
