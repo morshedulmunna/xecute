@@ -381,3 +381,17 @@ Set `api.versioning_enabled = false` to keep only unversioned aliases. Set
 active. Startup logs include each enabled version's Swagger and OpenAPI URLs.
 The registration pattern is explicit URL versioning; header-based versioning and
 automatic deprecation/sunset behavior are not implied.
+
+### Module imports and controller request inputs
+
+Run `cargo run -p xecute --example module_imports` for a complete example.
+[`modules.rs`](examples/module_imports/modules.rs) exports `GreetingService` from
+`GreetingModule`, then imports that module into `ExampleModule` so its controller
+can inject the service. Both definitions are registered in `ModuleGraph`.
+
+[`controller.rs`](examples/module_imports/controller.rs) includes curl commands
+and handlers for validated JSON (`#[body]`), path parameters (`#[param]`), validated
+query strings (`#[query]`), headers (`HeaderMap`), URL-encoded forms (`Form<T>`),
+raw text (`String`), and binary data (`Bytes`). Its comments also explain middleware
+extensions, connection info, and the separate file upload example. Use one
+body-consuming extractor per handler, placed last.

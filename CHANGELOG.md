@@ -7,6 +7,20 @@ created projects and resources.
 
 ## [Unreleased]
 
+## [0.1.18] - 2026-10-27
+
+Packages: `xecute-cli 0.1.18`, unchanged `xecute 0.1.9` and `xmacros 0.1.7`.
+
+### Added
+
+- Include module imports/exports guidance and an imports section in both MVC and
+  CQRS resource module templates.
+- Document controller inputs in both resource templates: validated JSON, path
+  parameters, query strings, headers, cookies, forms, text, bytes, middleware
+  extensions, connection info, and multipart uploads, with handler examples.
+- Add a runnable module-import example demonstrating exported service injection,
+  request extraction, validation, and HTTP checks in the source repository.
+
 ## [0.1.17] - 2026-10-24
 
 Packages: `xecute-cli 0.1.17`, `xecute 0.1.9`, and `xmacros 0.1.7`.

@@ -1,4 +1,14 @@
 //! Command and query handler registrations for this feature.
+//!
+//! Import another feature module to inject its exported providers (NestJS style):
+//! ```ignore
+//! use crate::modules::auth::AuthModule;
+//! // Add AuthModule to imports below. AuthModule must export AuthService.
+//! // Then add `auth: Arc<AuthService>` to your service/controller.
+//! ```
+//! Register AuthModule::definition() in AppModule::definitions() as well;
+//! generated resources are registered there automatically. Keep each provider in
+//! its owning module instead of registering the imported service again.
 
 use super::commands::Create__TYPE__Handler;
 use super::queries::List__TYPE__Handler;
@@ -9,6 +19,9 @@ use xecute::module;
 
 /// Resource dependency-injection module.
 #[module(
+    imports = [
+        // Other feature modules, e.g. AuthModule (see import guide above).
+    ],
     providers = [__TYPE__Repository, __TYPE__Service, Create__TYPE__Handler, List__TYPE__Handler, __TYPE__Controller],
     controllers = [__TYPE__Controller],
     exports = [__TYPE__Service, Create__TYPE__Handler, List__TYPE__Handler],

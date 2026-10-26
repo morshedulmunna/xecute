@@ -110,7 +110,7 @@ fn new_project_is_formatted_locked_and_accepts_resources() {
     assert!(!repository.contains("impl Provider"));
     assert!(!repository.contains("impl Injectable"));
     let module = fs::read_to_string(project.join("src/modules/user/module.rs")).unwrap();
-    assert!(module.contains("#[module(\n    providers = [UserRepository, UserService, UserController],\n    controllers = [UserController],\n    exports = [UserService],\n)]"));
+    assert!(module.contains("#[module(\n    imports = [\n        // Other feature modules, e.g. AuthModule (see import guide above).\n    ],\n    providers = [UserRepository, UserService, UserController],\n    controllers = [UserController],\n    exports = [UserService],\n)]"));
     let controller = fs::read_to_string(project.join("src/modules/user/controller.rs")).unwrap();
     assert!(controller.contains("#[controller(\"/user\")]"));
     assert!(controller.contains("#[derive(Injectable)]"));
