@@ -12,6 +12,15 @@ created projects and resources.
 
 ## [Unreleased]
 
+### Added
+
+- `xecute g library <name>` / `g lib <name>` creates a private, tested Cargo library
+  under `libs/`, registers workspace membership and a shared path dependency, and
+  inherits workspace settings without modifying application dependencies.
+- Preflight collisions/exclusions/symlinks, stage formatted files, serialize library
+  generation, and report recoverable lockfile errors. Add consumer-app tests and
+  a complete library guide included in the website and AI-agent skill bundle.
+
 ## [0.1.20] - 2026-10-27
 
 Packages: `xecute-cli 0.1.20`, `xecute 0.1.10`, and `xmacros 0.1.8`.

@@ -19,6 +19,7 @@
         "commands",
         "development",
         "workspaces",
+        "libraries",
         "update"
       ]
     },
@@ -593,6 +594,12 @@
       "title": "AI agent skills",
       "description": "Download the Xecute skill and complete machine-readable documentation for your coding agent.",
       "source": "docs/handbook/ai-skills.md"
+    },
+    {
+      "route": "cli/libraries",
+      "title": "Shared libraries",
+      "description": "Generate a reusable Rust crate and share it between workspace applications.",
+      "source": "docs/handbook/libraries.md"
     }
   ]
 }

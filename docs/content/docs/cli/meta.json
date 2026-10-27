@@ -4,6 +4,7 @@
     "commands",
     "development",
     "workspaces",
+    "libraries",
     "update"
   ]
 }

@@ -24,6 +24,7 @@ without adding a message bus or a second database.
 | I need to… | Go to |
 | --- | --- |
 | Understand generated files | [Project structure](architecture/project-structure.md) |
+| Share Rust code across applications | [Shared libraries](cli/libraries.md) |
 | Find a CLI command | [CLI reference](cli/commands.md) |
 | Move from NestJS | [Coming from NestJS](getting-started/coming-from-nestjs.md) |
 | Configure a port, limits, or environment | [Application configuration](configuration/application.md) |

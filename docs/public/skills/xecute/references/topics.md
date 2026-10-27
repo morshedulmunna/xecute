@@ -16,6 +16,7 @@ Read by task, or use [the complete manual](full.md).
 - [CLI reference](cli/commands.md): Project creation, resource generators and supported flags.
 - [Development runner](cli/development.md): Watch, rebuild, recover from errors and shut down development processes.
 - [Cargo workspaces](cli/workspaces.md): Generate multiple applications with shared dependencies and tooling.
+- [Shared libraries](cli/libraries.md): Generate a reusable Rust crate and share it between workspace applications.
 - [Update and uninstall](cli/update.md): Manage CLI installation without rewriting application source.
 
 ## Architecture and DI

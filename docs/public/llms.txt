@@ -56,3 +56,4 @@
 - [Release process](skills/xecute/references/reference/releases.md): Understand crate versions, tags and generated GitHub release notes.
 - [Changelog](skills/xecute/references/reference/changelog.md): Review changes across Xecute releases.
 - [AI agent skills](skills/xecute/references/skills/ai-agent.md): Download the Xecute skill and complete machine-readable documentation for your coding agent.
+- [Shared libraries](skills/xecute/references/cli/libraries.md): Generate a reusable Rust crate and share it between workspace applications.

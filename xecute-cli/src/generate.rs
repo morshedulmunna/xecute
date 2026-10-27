@@ -55,7 +55,7 @@ impl Architecture {
     }
 }
 
-fn names(input: &str) -> Result<(String, String)> {
+pub(crate) fn names(input: &str) -> Result<(String, String)> {
     if input.is_empty()
         || !input
             .bytes()
@@ -137,7 +137,7 @@ fn write(path: &Path, content: &str) -> Result<()> {
     fs::write(path, content).map_err(|e| format!("{}: {e}", path.display()))
 }
 
-fn format_files(root: &Path, paths: &[String]) -> Result<()> {
+pub(crate) fn format_files(root: &Path, paths: &[String]) -> Result<()> {
     let status = Command::new("rustfmt")
         .current_dir(root)
         .args(["--edition", "2024", "--config", "skip_children=true"])
@@ -576,7 +576,7 @@ pub fn new_workspace(
     write(
         &root.join("README.md"),
         &format!(
-            "# {name}\n\nAdd an application: `xecute g apps <app_name> [--mvc | --cqrs]`\n\nRun an application: `cd apps/{name} && xecute run dev`\n\nBuild all applications: `cargo build --workspace`\n"
+            "# {name}\n\nAdd an application: `xecute g apps <app_name> [--mvc | --cqrs]`\n\nAdd a shared library: `xecute g library <library_name>`\n\nRun an application: `cd apps/{name} && xecute run dev`\n\nBuild all applications: `cargo build --workspace`\n"
         ),
     )?;
     add_app(&root, name, Some(architecture), runtime.as_deref())?;

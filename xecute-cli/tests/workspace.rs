@@ -256,5 +256,26 @@ fn workspace_apps_support_both_architectures() {
             .status
             .success()
     );
+    let output = Command::new(env!("CARGO_BIN_EXE_xecute"))
+        .current_dir(&in_place)
+        .args(["g", "lib", "shared-utils"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(in_place.join("libs/shared-utils/src/lib.rs").is_file());
+    let output = Command::new("cargo")
+        .current_dir(&in_place)
+        .args(["test", "-p", "shared-utils", "--locked"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     fs::remove_dir_all(root).unwrap();
 }

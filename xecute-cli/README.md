@@ -698,3 +698,25 @@ and return `Ok(xecute::with_container(Self::apply_guards(router), container))`
 after all feature merges in `AppModule::router_with_container`. Keep controller
 providers registered and apply wrappers once. See the authentication guide for
 JWT configuration, additive roles/permissions, and public-module separation.
+
+## Shared libraries
+
+Generate a reusable Cargo library from a Xecute workspace root:
+
+```sh
+xecute g library shared-utils
+# Alias: xecute g lib shared-utils
+cargo test -p shared-utils --locked
+```
+
+The library lives in `libs/shared-utils`, is registered as a workspace member and
+shared path dependency, and includes a README, sample function, unit tests and
+doc test. Add `shared-utils = { workspace = true }` to a consuming application's
+`[dependencies]`, then import `shared_utils` in Rust. Libraries are private by
+default and do not add HTTP routes or DI registrations automatically. Existing
+files/dependencies, package-name collisions, excluded paths and symlink targets
+are checked before committing the library. A failed lockfile refresh preserves
+generated files and reports how to recover.
+
+Read the [library guide](https://xecute-docs.vercel.app/docs/cli/libraries) for
+workspace inheritance, provider sharing, and failure recovery.

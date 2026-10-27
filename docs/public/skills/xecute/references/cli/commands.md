@@ -22,13 +22,15 @@ xecute --version
 | `xecute new my-app --cqrs` | Application with command/query handlers |
 | `xecute new my-project --workspace` | Cargo workspace with its first MVC application under `apps/` |
 | `xecute g apps admin [--mvc \| --cqrs]` | Add an app from the workspace root; inherit architecture unless overridden |
+| `xecute g library shared-utils` or `xecute g lib shared-utils` | Create a reusable crate under `libs/` from the workspace root |
 | `xecute run dev` | Rebuild and restart the debug application when watched files change |
 | `xecute g resource user` or `xecute g res user` | Resource, module registration, routes, schemas, repository, and HTTP test |
 | `xecute g module billing` or `xecute g mo billing` | Registered module with an empty provider list |
 | `xecute g controller status` or `xecute g co status` | Standalone injectable controller with a GET endpoint |
 | `xecute g service mailer` or `xecute g s mailer` | Standalone injectable service |
 
-Run generators from the generated project root. Standalone controllers and
+Run feature generators from the generated project root. Run `g apps` and
+`g library` from the workspace root. Standalone controllers and
 services require manual provider/route registration when you decide to use them.
 Standalone generators remain available in both architecture modes.
 

@@ -2,6 +2,7 @@
 
 mod dev;
 mod generate;
+mod library;
 mod manage;
 mod manifest;
 
@@ -11,7 +12,7 @@ fn run() -> Result<(), String> {
     let mut args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() || matches!(args[0].as_str(), "--help" | "-h" | "help") {
         println!(
-            "Xecute — Rust modules, controllers and injectable services\n\n  xecute new <project|.> [--workspace] [--name <package-name>] [--mvc | --cqrs] [--runtime-path <cli/xecute>]\n  xecute update\n  xecute uninstall\n  xecute run dev [--bin <name>] [--features <list>] [--watch <path>] [-- <app arguments>]\n  xecute generate <resource|module|controller|service> <name>\n  xecute g <res|mo|co|s> <name>\n  xecute g apps <app_name> [--mvc | --cqrs] [--runtime-path <path>]\n\nNew projects use MVC by default; --cqrs selects command/query handlers. Run generate from a project created with xecute new. Resources include a GET endpoint; individual generators create standalone building blocks."
+            "Xecute — Rust modules, controllers and injectable services\n\n  xecute new <project|.> [--workspace] [--name <package-name>] [--mvc | --cqrs] [--runtime-path <cli/xecute>]\n  xecute update\n  xecute uninstall\n  xecute run dev [--bin <name>] [--features <list>] [--watch <path>] [-- <app arguments>]\n  xecute generate <resource|module|controller|service> <name>\n  xecute g <res|mo|co|s> <name>\n  xecute g apps <app_name> [--mvc | --cqrs] [--runtime-path <path>]\n  xecute g library <name> (alias: lib; run from workspace root)\n\nNew projects use MVC by default; --cqrs selects command/query handlers. Run generate from a project created with xecute new. Resources include a GET endpoint; individual generators create standalone building blocks."
         );
         return Ok(());
     }
@@ -95,6 +96,10 @@ fn run() -> Result<(), String> {
                 }
             }
             generate::add_app(&env::current_dir().map_err(|e| e.to_string())?, name, architecture, runtime.as_deref())
+        }
+        "generate" | "g" if args.first().is_some_and(|arg| matches!(arg.as_str(), "library" | "lib")) => {
+            if args.len() != 2 { return Err("usage: xecute g library <name> (run from workspace root)".into()); }
+            library::generate(&env::current_dir().map_err(|e| e.to_string())?, &args[1])
         }
         "generate" | "g" if args.len() == 2 => generate::component(
             &env::current_dir().map_err(|e| e.to_string())?,

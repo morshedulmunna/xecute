@@ -148,13 +148,15 @@ xecute --version
 | `xecute new my-app --cqrs` | Application with command/query handlers |
 | `xecute new my-project --workspace` | Cargo workspace with its first MVC application under `apps/` |
 | `xecute g apps admin [--mvc \| --cqrs]` | Add an app from the workspace root; inherit architecture unless overridden |
+| `xecute g library shared-utils` or `xecute g lib shared-utils` | Create a reusable crate under `libs/` from the workspace root |
 | `xecute run dev` | Rebuild and restart the debug application when watched files change |
 | `xecute g resource user` or `xecute g res user` | Resource, module registration, routes, schemas, repository, and HTTP test |
 | `xecute g module billing` or `xecute g mo billing` | Registered module with an empty provider list |
 | `xecute g controller status` or `xecute g co status` | Standalone injectable controller with a GET endpoint |
 | `xecute g service mailer` or `xecute g s mailer` | Standalone injectable service |
 
-Run generators from the generated project root. Standalone controllers and
+Run feature generators from the generated project root. Run `g apps` and
+`g library` from the workspace root. Standalone controllers and
 services require manual provider/route registration when you decide to use them.
 Standalone generators remain available in both architecture modes.
 
@@ -1464,3 +1466,25 @@ xecute run dev
 Configure distinct bind addresses in the apps' `config/AppConfig.toml` files
 when running them together. See [the CLI workspace guide](xecute-cli/README.md#multiple-applications-in-a-workspace)
 for local runtime paths, container builds, and in-place initialization.
+
+## Shared libraries
+
+Generate a reusable Cargo library from a Xecute workspace root:
+
+```sh
+xecute g library shared-utils
+# Alias: xecute g lib shared-utils
+cargo test -p shared-utils --locked
+```
+
+The library lives in `libs/shared-utils`, is registered as a workspace member and
+shared path dependency, and includes a README, sample function, unit tests and
+doc test. Add `shared-utils = { workspace = true }` to a consuming application's
+`[dependencies]`, then import `shared_utils` in Rust. Libraries are private by
+default and do not add HTTP routes or DI registrations automatically. Existing
+files/dependencies, package-name collisions, excluded paths and symlink targets
+are checked before committing the library. A failed lockfile refresh preserves
+generated files and reports how to recover.
+
+Read the [library guide](https://xecute-docs.vercel.app/docs/cli/libraries) for
+workspace inheritance, provider sharing, and failure recovery.

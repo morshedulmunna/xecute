@@ -20,6 +20,7 @@ read only the relevant topic files and follow their links.
   [first feature](references/getting-started/first-feature.md),
   [request flow](references/getting-started/request-flow.md).
 - Generation and architecture: [CLI commands](references/cli/commands.md),
+  [libraries](references/cli/libraries.md),
   [MVC/CQRS](references/architecture/mvc-cqrs.md),
   [modules](references/architecture/modules.md),
   [provider scopes](references/architecture/scopes.md).
@@ -54,6 +55,11 @@ available. Preserve generator markers in AppModule and feature registrations.
 Generation defaults to MVC; `.xecute/architecture` determines subsequent resources.
 If the CLI is unavailable, follow the documented generated structure manually
 and register both module definitions and routers.
+
+For reusable crates, run `xecute g library <name>` (alias `lib`) from the Xecute
+workspace root. It creates libs/<name> and a workspace path dependency. Add an
+explicit `{ workspace = true }` dependency to consuming apps; Cargo dependencies
+do not register DI modules or mount routes.
 
 ## Preserve the architectural boundaries
 
