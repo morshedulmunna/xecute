@@ -168,3 +168,24 @@
     --color-fd-accent-foreground: var(--theme-fd-accent-foreground);
     --color-fd-ring: var(--theme-fd-ring);
 }
+
+/* Carry the landing hero's ambient color into the reading experience. */
+.dark .x-docs-shell {
+    background-color: #0c0e11;
+    background-image:
+        radial-gradient(ellipse 760px 520px at 42% 0%, #9b6c241c, transparent 76%),
+        radial-gradient(ellipse 620px 780px at 105% 20%, #16346124, transparent 85%),
+        radial-gradient(ellipse 520px 650px at 5% 95%, #9b6c2409, transparent 80%);
+    background-attachment: fixed;
+}
+.dark .x-docs-shell #nd-sidebar {
+    background-color: #101216;
+    background-image: radial-gradient(ellipse 330px 500px at 15% 0%, #9b6c2410, transparent 80%);
+}
+.dark .x-docs-shell #nd-subnav {
+    background-color: #101216f5;
+    background-image: linear-gradient(110deg, #9b6c240a, #1634610a);
+}
+@media (max-width: 760px) {
+    .dark .x-docs-shell { background-attachment: scroll; }
+}

@@ -8,6 +8,7 @@ import { GithubSidebarFooter } from '../components/github-sidebar';
 export default function DocsLayoutShell({ children }: { children: ReactNode }) {
   return (
     <DocsLayout
+      containerProps={{ className: 'x-docs-shell' }}
       tree={source.pageTree}
       {...baseOptions()}
       sidebar={{
