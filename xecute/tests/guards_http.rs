@@ -264,3 +264,176 @@ async fn legacy_impl_controller_guards_execute() {
         StatusCode::FORBIDDEN
     );
 }
+
+async fn module_first(request: Request) -> Result<Request, HttpError> {
+    record(&request, "module first");
+    let scope = request.extensions().get::<xecute::RequestScope>().unwrap();
+    assert_eq!(*scope.resolve::<u32>().unwrap(), 42);
+    Ok(request)
+}
+async fn module_second(request: Request) -> Result<Request, HttpError> {
+    record(&request, "module second");
+    Ok(request)
+}
+
+#[controller("/sibling")]
+#[derive(Injectable)]
+struct SiblingController {}
+#[routes]
+impl SiblingController {
+    #[get("")]
+    async fn get(&self) -> &'static str {
+        "sibling"
+    }
+}
+
+#[xecute::module(
+    providers = [TestController, SiblingController],
+    controllers = [TestController, SiblingController],
+    guards = [module_first],
+)]
+#[guard(module_second)]
+struct GuardedModule;
+
+#[xecute::module(controllers = [TestController, SiblingController])]
+#[guard(module_first, deny, module_second)]
+struct DeniedModule;
+
+#[tokio::test]
+async fn module_guards_cover_every_controller_in_order_with_request_scope() {
+    let container = Arc::new(
+        xecute::ModuleGraph::new(vec![
+            GuardedModule::definition().provider(xecute::ProviderDefinition::value(42_u32)),
+        ])
+        .build()
+        .unwrap(),
+    );
+    let trace = Trace::default();
+    let app = Application::new(GuardedModule::scoped_router(container.clone()))
+        .use_guard(app_guard)
+        .use_middleware(app_middleware)
+        .into_router()
+        .layer(Extension(trace.clone()));
+    assert_eq!(
+        app.clone()
+            .oneshot(request("POST", "/guards", r#"{"name":"Munna"}"#))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        *trace.0.lock().unwrap(),
+        [
+            "app middleware",
+            "app guard",
+            "module first",
+            "module second",
+            "controller middleware",
+            "controller guard",
+            "route middleware",
+            "route first",
+            "route second",
+            "handler"
+        ]
+    );
+    trace.0.lock().unwrap().clear();
+    assert_eq!(
+        app.oneshot(request("GET", "/sibling", ""))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        *trace.0.lock().unwrap(),
+        [
+            "app middleware",
+            "app guard",
+            "module first",
+            "module second"
+        ]
+    );
+    assert_eq!(
+        container
+            .resolve::<TestController>()
+            .unwrap()
+            .calls
+            .load(Ordering::SeqCst),
+        1
+    );
+}
+
+#[tokio::test]
+async fn module_denial_stops_inner_guards_and_body_extraction_without_leaking() {
+    let container = Arc::new(
+        xecute::ModuleGraph::new(vec![
+            GuardedModule::definition().provider(xecute::ProviderDefinition::value(42_u32)),
+        ])
+        .build()
+        .unwrap(),
+    );
+    let trace = Trace::default();
+    let app = DeniedModule::scoped_router(container.clone())
+        .merge(Router::new().route("/public", axum::routing::get(|| async { "public" })))
+        .layer(Extension(trace.clone()));
+    for (method, path, status) in [
+        ("POST", "/guards", 403),
+        ("GET", "/sibling", 403),
+        ("GET", "/public", 200),
+        ("GET", "/missing", 404),
+        ("DELETE", "/sibling", 403),
+    ] {
+        trace.0.lock().unwrap().clear();
+        let response = app
+            .clone()
+            .oneshot(request(method, path, "malformed"))
+            .await
+            .unwrap();
+        assert_eq!(response.status().as_u16(), status, "{method} {path}");
+        let expected = if status == 403 {
+            vec!["module first"]
+        } else {
+            vec![]
+        };
+        assert_eq!(*trace.0.lock().unwrap(), expected);
+    }
+    assert_eq!(
+        container
+            .resolve::<TestController>()
+            .unwrap()
+            .calls
+            .load(Ordering::SeqCst),
+        0
+    );
+}
+
+#[tokio::test]
+async fn root_module_wrapper_guards_all_assembled_modules_before_feature_guards() {
+    #[xecute::module(imports = [GuardedModule])]
+    #[guard(deny)]
+    struct RootModule;
+    let container = Arc::new(
+        xecute::ModuleGraph::new(vec![
+            RootModule::definition(),
+            GuardedModule::definition().provider(xecute::ProviderDefinition::value(42_u32)),
+        ])
+        .build()
+        .unwrap(),
+    );
+    let trace = Trace::default();
+    let routes = GuardedModule::scoped_router(container.clone());
+    let app = xecute::with_container(RootModule::apply_guards(routes), container)
+        .layer(Extension(trace.clone()));
+    for path in ["/guards/same", "/sibling"] {
+        assert_eq!(
+            app.clone()
+                .oneshot(request("GET", path, ""))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::FORBIDDEN
+        );
+    }
+    assert!(trace.0.lock().unwrap().is_empty());
+}

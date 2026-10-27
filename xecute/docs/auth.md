@@ -1,6 +1,6 @@
 # Guards, JWT authentication, and authorization
 
-Xecute supports executable guards at application, controller, and HTTP-method
+Xecute supports executable guards at application, module, controller, and HTTP-method
 scope. Guards run before request DTO extraction and handler execution. Optional
 JWT authentication installs a verified principal; role and permission policies
 then authorize that principal.
@@ -15,6 +15,129 @@ xecute = { version = "0.1", features = ["auth"] }
 Custom guards require no feature flag. JWT verification, `AuthenticatedUser`,
 `#[roles]`, and `#[permissions]` require `auth`. Existing MVC/CQRS resources remain
 public until you attach guards. Generators do not create a login or user table.
+
+## Choose the scope: module, controller, or route
+
+Use `#[guard(...)]` with async guard functions. A guard receives a request and
+returns `Result<Request, E>`, where `E` implements `IntoResponse`. Returning an
+error stops the request before DTO validation and handler execution.
+
+This custom guard checks a header; JWT verification is shown later in this guide:
+
+```rust
+use xecute::{HttpError, HttpStatus, middleware::Request};
+
+async fn require_api_key(request: Request) -> Result<Request, HttpError> {
+    // Example policy only: load real credentials from validated configuration.
+    if request.headers().get("x-api-key").is_none() {
+        return Err(HttpError::new(HttpStatus::UNAUTHORIZED));
+    }
+    Ok(request)
+}
+```
+
+The example only checks presence. Do not use header presence as credential
+verification; verify the value against your configured policy or use the JWT guard.
+
+### Guard every controller in a module
+
+In a generated MVC user module, add the annotation **below** `#[module(...)]`:
+
+```rust
+# use xecute::{module, guard};
+#[module(
+    providers = [UserRepository, UserService, UserController],
+    controllers = [UserController],
+    exports = [UserService],
+)]
+#[guard(require_api_key)]
+pub struct UserModule;
+```
+
+This is a module fragment: keep the generated imports for your providers and
+import the guard function from its owning module. An equivalent declaration is
+`#[module(..., guards = [require_api_key])]`; use either style. Multiple guards
+run in list order. If both forms are used, `guards = [...]` runs first, followed
+by the `#[guard]`, `#[roles]`, and `#[permissions]` annotations in source order.
+
+Newly generated resources mount through `UserModule::scoped_router(...)`, so the
+module policy covers every controller in its `controllers` list. Imported modules
+are mounted separately; an import controls DI visibility, not HTTP ownership.
+
+For manual routing, merge the **module** router instead of individual controllers:
+
+```rust
+let router = axum::Router::new()
+    .merge(UserModule::scoped_router(container.clone()));
+```
+
+The `container` is an `Arc<Container>` built from all required module definitions.
+Request-scoped DI context is installed before module guards, so a guard can resolve
+providers through `RequestScope`. Controller types must still be registered as
+providers; the `controllers` list does not replace provider registration.
+
+### Guard one controller
+
+```rust
+# use xecute::prelude::*;
+#[controller("/user")]
+#[guard(require_api_key)]
+#[derive(Injectable)]
+pub struct UserController {}
+```
+
+This fragment protects every route in the controller. Use it when other
+controllers in the same module should have different policies.
+
+### Guard one route
+
+Inside the controller’s `#[routes]` implementation:
+
+```rust
+#[get("/private")]
+#[guard(require_api_key)]
+async fn private(&self) -> &'static str {
+    "Allowed"
+}
+```
+
+A route guard protects that HTTP method only. Other methods on the same path
+keep their own policies. Module/controller guards still apply to every matched
+path in their scope, including method-not-allowed requests. Unmatched paths and
+separately merged public modules do not inherit another module’s policy.
+
+### Combine scopes and JWT policies
+
+```text
+Application middleware → Application guards → Module guards
+→ Controller middleware → Controller guards
+→ Route middleware → Route guards → DTO extraction → Handler
+```
+
+Policies are additive. A route cannot bypass a guard on its controller or module.
+Keep login/public routes in a separately mounted public module when necessary.
+Module `#[roles(...)]` and `#[permissions(...)]` are supported with the `auth`
+feature, just like controller and route policies. Authentication must run before
+those checks, for example `#[guard(xecute::auth::authenticate_injected)]` followed
+by `#[roles("admin")]` on the module. Configure the verifier provider first.
+
+To guard every generated application route, place `#[guard(...)]` beneath the
+root `AppModule`’s `#[module(...)]`. Its generated router applies the root guards
+after assembling all resource modules, with DI context outside the guard layer.
+
+### Existing applications
+
+Updating the CLI does not rewrite previously generated routing code. Replace
+`UserController::scoped_router(container.clone())` merges with
+`UserModule::scoped_router(container.clone())` for each feature. In the root
+`router_with_container` helper, after all feature merges, return:
+
+```rust
+Ok(xecute::with_container(AppModule::apply_guards(router), container))
+```
+
+Apply each module wrapper once, before merging unrelated routes. Calling a
+controller router directly does not discover or apply its module’s guards.
 
 ## Run the example
 
@@ -147,8 +270,8 @@ these annotations outside their owning macro is a compile error. Legacy
 
 All listed roles and all listed permissions are required, with exact,
 case-sensitive matching. There is no implicit admin bypass, wildcard expansion,
-or OR policy. Controller and route policies are additive: a route cannot weaken
-its controller's requirements. Empty policies are compile errors (and direct
+or OR policy. Module, controller and route policies are additive: a route cannot weaken
+its enclosing scopes' requirements. Empty policies are compile errors (and direct
 runtime helper calls deny empty lists). For OR policies or record ownership,
 write a custom guard or domain authorization service.
 
@@ -211,7 +334,7 @@ owning module when sharing it across modules.
 
 Custom guards can resolve services via
 `request.extensions().get::<xecute::RequestScope>()` and `scope.resolve::<T>()`.
-Controller/route guards created by `scoped_router` already have a request scope.
+Module/controller/route guards created by `scoped_router` already have a request scope.
 For a global DI guard, install `xecute::with_container(router, container)` **outside**
 the assembled Application router, so the scope exists before the guard executes.
 With direct `Controller::router`, use the Extension-backed verifier or install
@@ -224,9 +347,10 @@ Xecute uses nested router scopes. At each scope, middleware runs before guards:
 
 ```text
 Application middleware → application guards
-  → controller middleware → controller guards
-    → route middleware → route guards
-      → request extraction/DTO validation → handler
+  → root module guards → feature module guards
+    → controller middleware → controller guards
+      → route middleware → route guards
+        → request extraction/DTO validation → handler
 ```
 
 Middleware registration and guard registration are each ordered independently;

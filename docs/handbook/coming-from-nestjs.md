@@ -11,7 +11,7 @@ will be familiar, but NestJS decorator names do not imply matching runtime APIs.
 | Controller and HTTP methods | `#[controller]`, `#[routes]`, `#[get]`, `#[post]` and other verbs |
 | Body/query/path inputs | `#[body]`, `#[query]`, singular `#[param]`; other Axum extractors directly |
 | Validation pipe | Automatic JSON/query DTO decoding plus `validator` validation |
-| Guards | Executable async functions returning `Result<Request, E>` |
+| Guards / UseGuards | `#[guard(...)]` on a module, controller, or route; async functions return `Result<Request, E>` |
 | Authentication/authorization | Optional `auth` verifier, `AuthenticatedUser`, roles/permissions |
 | Request scope | `Scope::Request`, `RequestScope` and scoped controller routers |
 | Lifecycle | `singleton_async`, `on_init`, `on_shutdown`, explicit async startup/shutdown |

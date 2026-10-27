@@ -682,3 +682,19 @@ On resolution failure, setup returns an error but keeps the generated files; fix
 registry/network access and run `cargo generate-lockfile` inside the project.
 New workspaces resolve their initial graph; adding an app to an existing workspace
 preserves its shared versions and lockfile through Cargo metadata resolution.
+
+## Guards at module, controller, and route scope
+
+Use `#[guard(check)]` below a module or controller annotation, or on a routed
+method inside `#[routes]`. Module declarations also accept `guards = [check]`.
+Generated applications mount `FeatureModule::scoped_router(container.clone())`,
+so module guards wrap all declared controllers. Root `AppModule` guards wrap all
+assembled resource modules. Guards run application → module → controller → route,
+with middleware ordered by its enclosing scope; failed guards stop extraction and
+handler execution. Imported modules need their own route mounting.
+
+For an existing app, merge module scoped routers instead of controller routers,
+and return `Ok(xecute::with_container(Self::apply_guards(router), container))`
+after all feature merges in `AppModule::router_with_container`. Keep controller
+providers registered and apply wrappers once. See the authentication guide for
+JWT configuration, additive roles/permissions, and public-module separation.

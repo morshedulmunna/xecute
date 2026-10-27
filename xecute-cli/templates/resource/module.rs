@@ -15,6 +15,8 @@ use super::{__TYPE__Controller, __TYPE__Service};
 use xecute::module;
 
 /// Resource dependency-injection module.
+/// Add `#[xecute::guard(your_guard)]` below `#[module(...)]` to protect all
+/// controllers in this module. The generated app mounts this module's scoped router.
 #[module(
     imports = [
         // Other feature modules, e.g. AuthModule (see import guide above).

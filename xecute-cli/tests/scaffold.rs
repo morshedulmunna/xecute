@@ -130,7 +130,7 @@ fn new_project_is_formatted_locked_and_accepts_resources() {
     assert!(!main.contains("#[path"));
     let app = fs::read_to_string(project.join("src/app_module.rs")).unwrap();
     assert!(app.contains("UserModule::definition()"));
-    assert!(app.contains("UserController::scoped_router"));
+    assert!(app.contains("UserModule::scoped_router"));
     fs::remove_dir_all(root).unwrap();
 }
 

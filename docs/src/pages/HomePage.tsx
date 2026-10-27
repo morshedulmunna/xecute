@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, BookOpen, Check, Copy, Database, Github, Layers3, Network, Package, ShieldCheck, Sparkles, Terminal, Workflow, Zap } from 'lucide-react';
 import { CURRENT_VERSION, GITHUB_URL } from '@/lib/constants';
 import './home.css';
+import { LandingBottom, LandingJourney, LandingQuestions } from './LandingBottom';
 
 const guides = [
   { title: 'Your first application', description: 'From one command to a working API. Choose MVC or CQRS and start building.', to: '/docs/getting-started/quickstart', icon: Terminal, label: 'START BUILDING' },
@@ -11,22 +12,23 @@ const guides = [
   { title: 'Protect what you build', description: 'Trusted JWT verification, verified users and clear role and permission policies.', to: '/docs/integrations/auth', icon: ShieldCheck, label: 'AUTHENTICATION' },
 ];
 const capabilities = [
-  { label: 'Lifecycle', to: '/docs/architecture/lifecycle', icon: Zap },
-  { label: 'PostgreSQL', to: '/docs/integrations/postgres', icon: Database },
-  { label: 'JWT & guards', to: '/docs/integrations/auth', icon: ShieldCheck },
-  { label: 'Background jobs', to: '/docs/integrations/jobs', icon: Workflow },
-  { label: 'TTL caching', to: '/docs/integrations/cache', icon: Package },
-  { label: 'CQRS buses', to: '/docs/integrations/cqrs', icon: Network },
+  { label: 'Lifecycle', to: '/docs/architecture/lifecycle', icon: Zap, title: 'Ready before the first request.', description: 'Connect resources in dependency order. Drain work and close them when your application shuts down.', setup: 'Built into the runtime', code: 'container.initialize_async().await?;\n// Serve requests, then drain work.\ncontainer.shutdown_async().await?;', tags: ['Async startup', 'Ordered cleanup'] },
+  { label: 'PostgreSQL', to: '/docs/integrations/postgres', icon: Database, title: 'Give your data a lasting home.', description: 'Move beyond in-memory storage with shared SQLx pools, migrations and transactions behind your repository.', setup: 'Cargo feature: postgres', code: 'xecute = { version = "0.1",\n  features = ["postgres"] }', tags: ['SQLx pools', 'Migrations', 'Transactions'] },
+  { label: 'JWT & guards', to: '/docs/integrations/auth', icon: ShieldCheck, title: 'Put a boundary around your API.', description: 'Verify identity, then apply guards at module, controller or route level. Keep permissions explicit.', setup: 'Cargo feature: auth', code: '#[controller("/users")]\n#[guard(auth::authenticate_injected)]\n#[roles("admin")]\n#[derive(Injectable)]\npub struct UserController {}', tags: ['Verified JWTs', 'Roles & permissions'] },
+  { label: 'Background jobs', to: '/docs/integrations/jobs', icon: Workflow, title: 'Let the request move on.', description: 'Run bounded in-process workers with retries and graceful draining. Use a durable broker for work that must survive a restart.', setup: 'Cargo feature: jobs', code: 'xecute = { version = "0.1",\n  features = ["jobs"] }', tags: ['Bounded workers', 'Retry policies', 'Scheduling'] },
+  { label: 'TTL caching', to: '/docs/integrations/cache', icon: Package, title: 'Keep useful data close.', description: 'Choose memory or Redis, set an expiration and invalidate deliberately. You control the keys and what gets cached.', setup: 'Cargo feature: cache or cache-redis', code: 'xecute = { version = "0.1",\n  features = ["cache-redis"] }', tags: ['Memory or Redis', 'Explicit TTLs'] },
+  { label: 'CQRS buses', to: '/docs/integrations/cqrs', icon: Network, title: 'One operation. A clear path.', description: 'Dispatch typed commands and queries, publish in-process events and share execution policies through behaviors.', setup: 'Cargo feature: cqrs', code: 'xecute = { version = "0.1",\n  features = ["cqrs"] }', tags: ['Typed dispatch', 'Event subscribers', 'Pipelines'] },
 ];
-const install = `cargo install xecute-cli --version ${CURRENT_VERSION} --locked`;
+const install = 'cargo install xecute-cli';
 
 function Brand() {
   return <span className="x-brand"><img className="x-brand-mark" src={`${import.meta.env.BASE_URL}logo.svg`} alt="" width="32" height="32" /><span>Xecute<span className="x-amber">CLI</span></span></span>;
 }
 
 export default function HomePage() {
-  const [motionPaused, setMotionPaused] = useState(false);
-  const [architecture, setArchitecture] = useState<'mvc' | 'cqrs'>('mvc');
+  const [selectedCapability, setSelectedCapability] = useState(0);
+  const capability = capabilities[selectedCapability];
+  const architecture = 'mvc';
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   useEffect(() => { document.title = 'Xecute — Architecture tools for Axum'; }, []);
   useEffect(() => {
@@ -34,12 +36,12 @@ export default function HomePage() {
     const timeout = window.setTimeout(() => setCopyState('idle'), 2500);
     return () => window.clearTimeout(timeout);
   }, [copyState]);
-  function changeArchitecture(event: KeyboardEvent<HTMLDivElement>) {
+  function changeCapability(event: KeyboardEvent<HTMLDivElement>) {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
-    const selected = event.key === 'Home' ? 'mvc' : event.key === 'End' ? 'cqrs' : architecture === 'mvc' ? 'cqrs' : 'mvc';
-    setArchitecture(selected);
-    document.getElementById(`${selected}-tab`)?.focus();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? capabilities.length - 1 : (selectedCapability + (event.key === 'ArrowRight' ? 1 : -1) + capabilities.length) % capabilities.length;
+    setSelectedCapability(next);
+    document.getElementById(`capability-tab-${next}`)?.focus();
   }
   async function copyCommand() {
     try { await navigator.clipboard.writeText(install); setCopyState('copied'); }
@@ -65,9 +67,9 @@ export default function HomePage() {
             <div className="x-hero-facts"><span><Check size={12} />Built on Axum</span><span><Check size={12} />MVC or CQRS</span><span><Check size={12} />Explicit by design</span></div>
           </div>
 
-          <div className={`x-motion-scene${motionPaused ? ' x-motion-paused' : ''}`}>
-            <div className="x-motion-controls"><span>YOUR FEATURE, CONNECTED</span><div className="x-architecture-tabs" role="tablist" aria-label="Generated architecture" onKeyDown={changeArchitecture}><button type="button" id="mvc-tab" tabIndex={architecture === 'mvc' ? 0 : -1} role="tab" aria-selected={architecture === 'mvc'} aria-controls="architecture-preview" onClick={() => setArchitecture('mvc')}>MVC</button><button type="button" id="cqrs-tab" tabIndex={architecture === 'cqrs' ? 0 : -1} role="tab" aria-selected={architecture === 'cqrs'} aria-controls="architecture-preview" onClick={() => setArchitecture('cqrs')}>CQRS</button></div></div>
-            <div id="architecture-preview" role="tabpanel" aria-labelledby={`${architecture}-tab`}>
+          <div className="x-motion-scene x-visual-preview">
+            <div className="x-motion-controls"><span>YOUR FEATURE, CONNECTED</span><span className="x-preview-label">MODULAR BY DESIGN</span></div>
+            <div>
               <svg className="x-motion-svg" viewBox="0 0 560 460" role="img" aria-labelledby="motion-title motion-description">
                 <title id="motion-title">From a CLI command to a connected Rust feature</title>
                 <desc id="motion-description">Xecute generates a user module. Requests flow through a controller, {architecture === 'mvc' ? 'service' : 'command or query handler'}, and repository. DTOs and dependency injection connect the feature.</desc>
@@ -84,7 +86,7 @@ export default function HomePage() {
                 <g className="x-motion-chips"><rect x="153" y="389" width="103" height="29" rx="14" /><text x="204" y="408" textAnchor="middle">Typed DTOs</text><rect x="266" y="389" width="141" height="29" rx="14" /><text x="336" y="408" textAnchor="middle">Dependency injection</text></g>
               </svg>
             </div>
-            <div className="x-motion-footer"><span><span className="x-status-dot" />One command. Clear boundaries.</span><button type="button" aria-pressed={motionPaused} onClick={() => setMotionPaused(!motionPaused)}>{motionPaused ? 'Play motion' : 'Pause motion'}</button></div>
+            <div className="x-preview-caption"><span className="x-status-dot" />One feature. Every layer in its place.</div>
           </div>
           </div>
           <div className={`x-hero-install x-install-${copyState}`}>
@@ -98,12 +100,24 @@ export default function HomePage() {
           <div className="x-hero-links"><Link to="/docs"><BookOpen size={16} />Explore the documentation<ArrowRight size={15} /></Link><span aria-hidden="true">✦</span><a href={GITHUB_URL}><Github size={16} />View the source</a></div>
         </section>
 
+        <LandingBottom>
+        <LandingJourney />
         <section className="x-guides" aria-labelledby="guides-title">
           <div className="x-section-heading"><div><p className="x-kicker">FROM FIRST ROUTE TO WHAT’S NEXT</p><h2 id="guides-title">A little structure.<br /><span>A lot of possibility.</span></h2></div><p>Build one feature at a time.<br />There’s a guide for the next step.</p></div>
           <div className="x-guide-grid">{guides.map(({ title, description, to, icon: Icon, label }) => <Link key={to} to={to} className="x-guide"><div className="x-guide-top"><Icon size={22} /><ArrowRight size={18} /></div><p className="x-kicker">{label}</p><h3>{title}</h3><p>{description}</p></Link>)}</div>
         </section>
 
-        <section className="x-runtime" aria-labelledby="runtime-title"><div><p className="x-kicker">GROW AT YOUR PACE</p><h2 id="runtime-title">Add what your application needs.</h2><p>Optional runtime capabilities, with a guide for every step.</p></div><div className="x-runtime-links">{capabilities.map(({ label, to, icon: Icon }) => <Link key={to} to={to}><Icon size={17} />{label}<ArrowRight size={14} /></Link>)}</div><aside><span className="x-status-dot" /><p>Build with lifecycle management, PostgreSQL, authentication, background jobs, caching and CQRS buses. Enable the features your application needs.</p><Link to="/docs/getting-started/status">Feature guide<ArrowRight size={14} /></Link></aside></section>
+        <section className="x-runtime x-feature-explorer" aria-labelledby="runtime-title">
+          <div className="x-section-heading"><div><p className="x-kicker">SMALL CORE. ROOM TO GROW.</p><h2 id="runtime-title">Your API.<br /><span>Your building blocks.</span></h2></div><p>Start lean. Add what you need.<br />Explore a capability to see where it fits.</p></div>
+          <div className="x-feature-tabs" role="tablist" aria-label="Runtime capabilities" onKeyDown={changeCapability}>{capabilities.map(({ label, icon: Icon }, index) => <button type="button" key={label} id={`capability-tab-${index}`} role="tab" aria-selected={selectedCapability === index} aria-controls="capability-panel" tabIndex={selectedCapability === index ? 0 : -1} onClick={() => setSelectedCapability(index)}><Icon size={16} />{label}</button>)}</div>
+          <div id="capability-panel" className="x-feature-panel" role="tabpanel" aria-labelledby={`capability-tab-${selectedCapability}`} tabIndex={0}>
+            <div className="x-feature-detail" key={capability.label}><span className="x-feature-symbol"><capability.icon size={26} /></span><h3>{capability.title}</h3><p>{capability.description}</p><div className="x-feature-tags">{capability.tags.map(tag => <span key={tag}><Check size={11} />{tag}</span>)}</div><Link to={capability.to}>Explore {capability.label}<ArrowRight size={15} /></Link></div>
+            <div className="x-feature-code"><div><span><Terminal size={13} />{capability.setup}</span><span>{selectedCapability === 0 || selectedCapability === 2 ? 'Rust fragment' : 'Cargo.toml'}</span></div><pre key={capability.label}><code>{capability.code}</code></pre><p><span className="x-status-dot" />Configure explicitly. Keep your application in control.</p></div>
+          </div>
+        </section>
+        <LandingQuestions />
+        <section className="x-final-cta"><span className="x-final-mark" aria-hidden="true"><img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" width="40" height="40" /></span><p className="x-kicker">MAKE SOMETHING THAT MATTERS</p><h2>The structure is ready.<br /><span>What will you build?</span></h2><Link className="x-primary-action" to="/docs/getting-started/quickstart">Build your first API<ArrowRight size={16} /></Link><p>From your first route to your next application.</p></section>
+        </LandingBottom>
       </main>
       <footer className="x-footer"><Link to="/" aria-label="Xecute home"><Brand /></Link><p>Architecture tools for Axum.<span aria-hidden="true">✦</span>Apache-2.0</p><a href={GITHUB_URL}>Built in the open<ArrowRight size={14} /></a></footer>
     </div>

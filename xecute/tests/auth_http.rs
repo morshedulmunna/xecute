@@ -428,3 +428,47 @@ async fn authentication_can_resolve_verifier_from_container_scope() {
     );
     assert_eq!(response_status(&app, "/injected", None).await, 401);
 }
+
+#[tokio::test]
+async fn module_authentication_and_additive_policies_protect_declared_controllers() {
+    #[controller("/module-auth")]
+    #[derive(Injectable)]
+    struct ModuleController {}
+    #[routes]
+    impl ModuleController {
+        #[get("")]
+        #[permissions("users:write")]
+        async fn get(&self, user: AuthenticatedUser) -> String {
+            user.0.subject().to_owned()
+        }
+    }
+    #[xecute::module(providers = [ModuleController], controllers = [ModuleController])]
+    #[guard(auth::authenticate_injected)]
+    #[roles("admin")]
+    #[permissions("users:read")]
+    struct PrivateModule;
+    let container = Arc::new(
+        xecute::ModuleGraph::new(vec![
+            PrivateModule::definition().provider(xecute::ProviderDefinition::value(verifier())),
+        ])
+        .build()
+        .unwrap(),
+    );
+    let app = PrivateModule::scoped_router(container);
+    assert_eq!(response_status(&app, "/module-auth", None).await, 401);
+    for (roles, permissions, status) in [
+        (json!(["member"]), json!(["users:read", "users:write"]), 403),
+        (json!(["admin"]), json!(["users:write"]), 403),
+        (json!(["admin"]), json!(["users:read"]), 403),
+        (json!(["admin"]), json!(["users:read", "users:write"]), 200),
+    ] {
+        let mut payload = claims();
+        payload["roles"] = roles;
+        payload["permissions"] = permissions;
+        let authorization = format!("Bearer {}", token(&payload));
+        assert_eq!(
+            response_status(&app, "/module-auth", Some(&authorization)).await,
+            status
+        );
+    }
+}

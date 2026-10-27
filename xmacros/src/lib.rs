@@ -136,11 +136,11 @@ pub fn middleware(_attribute: TokenStream, item: TokenStream) -> TokenStream {
 // Owning macros consume these attributes. Outside that context, fail explicitly.
 macro_rules! guard_annotation {
     ($($name:ident),* $(,)?) => { $(
-        /// Declare guards or authorization policy beneath controller/routes, or on a routed handler.
+        /// Declare guards or authorization policy beneath module/controller/routes, or on a routed handler.
         #[proc_macro_attribute]
         pub fn $name(_attribute: TokenStream, item: TokenStream) -> TokenStream {
             let error = syn::Error::new(proc_macro2::Span::call_site(),
-                "place guard/roles/permissions below #[controller] on a struct or #[routes] on an impl; handler policies belong inside #[routes]")
+                "place guard/roles/permissions below #[module] or #[controller] on a struct, or #[routes] on an impl; handler policies belong inside #[routes]")
                 .into_compile_error();
             let item: proc_macro2::TokenStream = item.into();
             quote::quote!(#error #item).into()

@@ -848,7 +848,7 @@ fn component_inner(root: &Path, kind: &str, name: &str, inherit_dependencies: bo
             } else {
                 "::std::sync::Arc::new(container.clone())"
             };
-            app = app.replace(markers[3], &format!("let router = router.merge(crate::modules::{snake}::{pascal}Controller::scoped_router({controller_container}));\n        {}", markers[3]));
+            app = app.replace(markers[3], &format!("let router = router.merge(crate::modules::{snake}::{pascal}Module::scoped_router({controller_container}));\n        {}", markers[3]));
         }
     }
     if kind == "resource" {
@@ -991,7 +991,7 @@ mod tests {
         .unwrap();
         component(&root, "res", "user").unwrap();
         let before = fs::read_to_string(root.join("src/app_module.rs")).unwrap();
-        assert!(before.contains("UserController::scoped_router"));
+        assert!(before.contains("UserModule::scoped_router"));
         assert!(component(&root, "res", "user").is_err());
         assert_eq!(
             before,

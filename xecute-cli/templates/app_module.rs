@@ -46,6 +46,6 @@ impl AppModule {
         let _ = &container;
         let router = Router::new();
         // xecute:routes
-        Ok(router)
+        Ok(xecute::with_container(Self::apply_guards(router), container))
     }
 }

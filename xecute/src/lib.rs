@@ -18,7 +18,7 @@ pub use xmacros::*;
 pub mod middleware;
 pub use middleware::Application;
 
-/// Executable application, controller, and route guards.
+/// Executable application, module, controller, and route guards.
 pub mod guards;
 
 /// JWT bearer authentication, verified principals, and role/permission policies.
@@ -74,7 +74,7 @@ pub mod prelude {
         Application, HttpError, HttpStatus, Inject, Injectable, controller, middleware, routes,
     };
     pub use axum::{
-        Json,
+        Json, Router,
         response::{IntoResponse, Response},
     };
 }
