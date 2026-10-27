@@ -49,7 +49,7 @@ No `#[path]` annotations are generated. Existing component folders are never
 overwritten. Run generation from the project root. Automatic registration uses
 the comments in `app_module.rs`; keep these markers when editing that file.
 
-Generated projects use `xecute = { version = "0.1.8" }` from crates.io by default.
+Generated projects use `xecute = { version = "0.1.10" }` from crates.io by default.
 Use `xecute new my-api --runtime-path /path/to/xecute/xecute` for local development.
 
 Generated CQRS resource folders contain `module.rs`, `controller.rs`,

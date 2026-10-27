@@ -97,11 +97,11 @@ The generated repository stores records in memory.
 Run this from any directory:
 
 ```sh
-cargo install xecute-cli --version 0.1.19 --locked
+cargo install xecute-cli --version 0.1.20 --locked
 xecute --version
 ```
 
-The version command should print `xecute 0.1.19`. If the command is missing, check
+The version command should print `xecute 0.1.20`. If the command is missing, check
 that Cargo’s `bin` directory is on your `PATH`. To replace an existing CLI install,
 add `--force` to the install command.
 
@@ -3985,6 +3985,22 @@ does not rewrite existing application source; generator changes apply to newly
 created projects and resources.
 
 ## [Unreleased]
+
+## [0.1.20] - 2026-10-27
+
+Packages: `xecute-cli 0.1.20`, `xecute 0.1.10`, and `xmacros 0.1.8`.
+
+### Changed
+
+- Resolve a fresh lockfile with the latest compatible dependencies when creating
+  standalone MVC/CQRS applications, including local-runtime projects. Report
+  resolution failures with retry instructions instead of copying a bundled snapshot.
+- Mount generated features through their module routers. Support module-level
+  `#[guard(...)]`, `guards = [...]`, roles and permissions alongside controller and
+  route policies, with ordered execution and request-scoped DI context.
+- Publish the redesigned dark documentation site, guided tutorials, and downloadable
+  AI-agent skill bundle with synchronized topic references and a complete manual.
+
 
 ### Added
 

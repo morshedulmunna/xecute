@@ -19,7 +19,8 @@
     "lint": "eslint .",
     "sync:content": "node scripts/sync-content.mjs",
     "check:docs": "node scripts/sync-content.mjs --check && node scripts/check-docs.mjs",
-    "check:render": "node scripts/render-docs.mjs"
+    "check:render": "node scripts/render-docs.mjs",
+    "prepare:vercel": "node scripts/prepare-vercel.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",

@@ -6,15 +6,24 @@ fn upgrade_runtime(item: &mut Item) {
     let old = |version: &str| {
         matches!(
             version,
-            "0.1.0" | "0.1.1" | "0.1.2" | "0.1.3" | "0.1.4" | "0.1.5" | "0.1.6"
+            "0.1.0"
+                | "0.1.1"
+                | "0.1.2"
+                | "0.1.3"
+                | "0.1.4"
+                | "0.1.5"
+                | "0.1.6"
+                | "0.1.7"
+                | "0.1.8"
+                | "0.1.9"
         )
     };
     if item.as_str().is_some_and(old) {
-        *item = value("0.1.7");
+        *item = value("0.1.10");
     } else if let Some(table) = item.as_table_like_mut()
         && table.get("version").and_then(Item::as_str).is_some_and(old)
     {
-        table.insert("version", value("0.1.7"));
+        table.insert("version", value("0.1.10"));
     }
 }
 fn enable_testing(item: &mut Item) -> Result<(), String> {

@@ -25,11 +25,11 @@ The generated repository stores records in memory.
 Run this from any directory:
 
 ```sh
-cargo install xecute-cli --version 0.1.19 --locked
+cargo install xecute-cli --version 0.1.20 --locked
 xecute --version
 ```
 
-The version command should print `xecute 0.1.19`. If the command is missing, check
+The version command should print `xecute 0.1.20`. If the command is missing, check
 that Cargo’s `bin` directory is on your `PATH`. To replace an existing CLI install,
 add `--force` to the install command.
 

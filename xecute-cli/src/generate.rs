@@ -209,7 +209,7 @@ fn scaffold(
             .replace('"', "\\\"");
         format!("xecute = {{ path = \"{runtime}\" }}")
     } else {
-        "xecute = { version = \"0.1.8\" }".to_owned()
+        "xecute = { version = \"0.1.10\" }".to_owned()
     };
     let test_dependency = crate::manifest::testing_dependency(&dependency)?;
     let templates = [

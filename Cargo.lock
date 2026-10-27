@@ -3626,7 +3626,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "xecute"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "aws-config",
  "aws-sdk-s3",
@@ -3652,7 +3652,7 @@ dependencies = [
 
 [[package]]
 name = "xecute-cli"
-version = "0.1.19"
+version = "0.1.20"
 dependencies = [
  "ctrlc",
  "nix",
@@ -3662,7 +3662,7 @@ dependencies = [
 
 [[package]]
 name = "xmacros"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "proc-macro2",
  "quote",

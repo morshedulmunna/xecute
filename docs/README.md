@@ -102,3 +102,20 @@ generates `public/skills/xecute/` with every topic, a reference index and full m
 plus `public/llms.txt`, `public/llms-full.txt`, and a deterministic offline ZIP.
 `check:docs` checks their freshness as well as website pages. Edit maintained
 sources, not generated references. The Skills page is in the navigation.
+
+## Vercel production deployment
+
+Live site: https://xecute-docs.vercel.app
+
+Deploy from the repository root using the linked `docs` project:
+
+```sh
+SITE_URL=https://xecute-docs.vercel.app bun run --cwd docs build
+bun run --cwd docs prepare:vercel
+vercel deploy --cwd docs --prebuilt --prod
+```
+
+The packaging step uploads only static build output, preserves direct `/docs/...`
+routes, and sends the skill ZIP with an attachment header. Keep `.vercel/` and
+Vercel-generated environment files out of Git. Deployments are manual; the GitHub
+repository connection was not established, so pushes do not deploy automatically.

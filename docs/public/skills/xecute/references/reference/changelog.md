@@ -7,6 +7,22 @@ created projects and resources.
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-10-27
+
+Packages: `xecute-cli 0.1.20`, `xecute 0.1.10`, and `xmacros 0.1.8`.
+
+### Changed
+
+- Resolve a fresh lockfile with the latest compatible dependencies when creating
+  standalone MVC/CQRS applications, including local-runtime projects. Report
+  resolution failures with retry instructions instead of copying a bundled snapshot.
+- Mount generated features through their module routers. Support module-level
+  `#[guard(...)]`, `guards = [...]`, roles and permissions alongside controller and
+  route policies, with ordered execution and request-scoped DI context.
+- Publish the redesigned dark documentation site, guided tutorials, and downloadable
+  AI-agent skill bundle with synchronized topic references and a complete manual.
+
+
 ### Added
 
 - Optional typed CommandBus/QueryBus dispatch and observable EventBus fan-out,

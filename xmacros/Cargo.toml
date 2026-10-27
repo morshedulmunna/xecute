@@ -1,6 +1,6 @@
 [package]
 name = "xmacros"
-version = "0.1.7"
+version = "0.1.8"
 edition.workspace = true
 rust-version.workspace = true
 description = "Application architecture and dependency-injection macros for Axum"
