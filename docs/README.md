@@ -94,3 +94,11 @@ GitHub, and runtime guides remain available inside the runtime package.
 
 The documentation shell's retained third-party license is in `LICENSE`; Xecute
 runtime/CLI/macros use the license declared in their Cargo manifests.
+
+## AI agent resources
+
+`agent-skill/xecute/SKILL.md` maintains the agent entry point. `sync:content`
+generates `public/skills/xecute/` with every topic, a reference index and full manual,
+plus `public/llms.txt`, `public/llms-full.txt`, and a deterministic offline ZIP.
+`check:docs` checks their freshness as well as website pages. Edit maintained
+sources, not generated references. The Skills page is in the navigation.

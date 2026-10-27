@@ -1,0 +1,58 @@
+# Xecute
+
+> Architecture tools and macros for Axum applications.
+
+## Agent resources
+
+- [Skill](skills/xecute/SKILL.md)
+- [Offline skill bundle](skills/xecute.zip)
+- [Complete manual](llms-full.txt)
+
+## Documentation
+
+- [Learn Xecute](skills/xecute/references/index.md): A guided path from your first Rust API to modules, testing, and integrations.
+- [Build your first API](skills/xecute/references/getting-started/quickstart.md): Install Xecute, run an API, and understand your first successful and invalid requests.
+- [Your first feature](skills/xecute/references/getting-started/first-feature.md): Generate a user feature, find the right files, change a rule, and run tests.
+- [How a request works](skills/xecute/references/getting-started/request-flow.md): Understand DTOs, controllers, services, repositories, and module imports.
+- [Features and setup](skills/xecute/references/getting-started/status.md): Choose runtime features and understand what the generator configures for you.
+- [Upgrade an existing application](skills/xecute/references/getting-started/adopting-existing.md): Enable the five new runtime capabilities without assuming files are regenerated.
+- [Coming from NestJS](skills/xecute/references/getting-started/coming-from-nestjs.md): Map NestJS concepts to the APIs actually implemented in Xecute.
+- [CLI reference](skills/xecute/references/cli/commands.md): Project creation, resource generators and supported flags.
+- [Development runner](skills/xecute/references/cli/development.md): Watch, rebuild, recover from errors and shut down development processes.
+- [Cargo workspaces](skills/xecute/references/cli/workspaces.md): Generate multiple applications with shared dependencies and tooling.
+- [Update and uninstall](skills/xecute/references/cli/update.md): Manage CLI installation without rewriting application source.
+- [Project structure](skills/xecute/references/architecture/project-structure.md): Understand generated modules, server infrastructure and feature folders.
+- [MVC and CQRS](skills/xecute/references/architecture/mvc-cqrs.md): Choose service-based MVC or direct-handler CQRS generation.
+- [Providers and modules](skills/xecute/references/architecture/modules.md): Register providers and enforce imports, exports and dependency boundaries.
+- [Feature folders](skills/xecute/references/architecture/feature-folders.md): Keep DTOs, entities, repositories and tests together by feature.
+- [Provider scopes](skills/xecute/references/architecture/scopes.md): Use singleton, transient and request lifetimes safely.
+- [Async startup and shutdown](skills/xecute/references/architecture/lifecycle.md): Initialize resources in dependency order and clean up after draining.
+- [Controllers and extractors](skills/xecute/references/http/controllers.md): Route handlers, JSON bodies, path parameters and query DTOs.
+- [DTO validation](skills/xecute/references/http/validation.md): Reject malformed and invalid requests before application work.
+- [Middleware](skills/xecute/references/http/middleware.md): Compose app, controller and route middleware in documented order.
+- [Swagger and OpenAPI](skills/xecute/references/http/openapi.md): Generate OpenAPI schemas and serve local Swagger documentation.
+- [Errors and domain mappings](skills/xecute/references/http/errors.md): Map failures to safe correlated HTTP error envelopes.
+- [API version groups](skills/xecute/references/http/versioning.md): Mount explicit versioned routes and separate API documents.
+- [Multipart uploads](skills/xecute/references/http/uploads.md): Validate streaming uploads and use private local or optional S3 storage.
+- [Static files](skills/xecute/references/http/static-files.md): Serve explicitly public assets without exposing application files.
+- [Application configuration](skills/xecute/references/configuration/application.md): Configure generated servers through validated TOML and environment secrets.
+- [Typed configuration](skills/xecute/references/configuration/typed.md): Read reusable typed configuration with redacted validation errors.
+- [Logging and exporters](skills/xecute/references/configuration/logging.md): Configure structured logs, file rotation and custom exporter layers.
+- [Server defaults](skills/xecute/references/configuration/server-defaults.md): Understand request limits, health endpoints and graceful shutdown policies.
+- [Welcome and startup URLs](skills/xecute/references/configuration/welcome.md): Discover enabled documentation, static assets and route version groups.
+- [PostgreSQL](skills/xecute/references/integrations/postgres.md): Configure lifecycle-managed pools, migrations, repositories and transactions.
+- [Guards and JWT authentication](skills/xecute/references/integrations/auth.md): Protect routes with verified users and role/permission policies.
+- [Jobs and scheduling](skills/xecute/references/integrations/jobs.md): Run bounded process-local workers with retries, receipts and interval schedules.
+- [Memory and Redis caching](skills/xecute/references/integrations/cache.md): Use explicit TTL caching with bounded memory or namespaced Redis.
+- [CQRS buses and events](skills/xecute/references/integrations/cqrs.md): Register typed command/query handlers, event subscribers and shared pipelines.
+- [Quality checks](skills/xecute/references/testing/checks.md): Run runtime, generator and generated-application checks.
+- [Testing modules and HTTP](skills/xecute/references/testing/modules.md): Override providers and exercise real routers in isolated tests.
+- [Runnable examples](skills/xecute/references/testing/examples.md): Find feature flags, commands and external services for each example.
+- [Deployment](skills/xecute/references/operations/deployment.md): Build, containerize and operate generated applications.
+- [Development and packages](skills/xecute/references/operations/contributing.md): Work on the CLI, runtime and macro crates.
+- [Troubleshooting](skills/xecute/references/operations/troubleshooting.md): Resolve common generation and application startup issues.
+- [Scope and limitations](skills/xecute/references/operations/limitations.md): Separate implemented capabilities from application extensions.
+- [Cargo feature reference](skills/xecute/references/reference/features.md): Choose the Cargo flags and setup required for each runtime capability.
+- [Release process](skills/xecute/references/reference/releases.md): Understand crate versions, tags and generated GitHub release notes.
+- [Changelog](skills/xecute/references/reference/changelog.md): Review changes across Xecute releases.
+- [AI agent skills](skills/xecute/references/skills/ai-agent.md): Download the Xecute skill and complete machine-readable documentation for your coding agent.

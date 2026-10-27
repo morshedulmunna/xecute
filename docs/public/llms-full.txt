@@ -1,0 +1,4375 @@
+# Xecute complete documentation
+
+
+---
+
+# Learn Xecute
+
+Documentation route: /docs
+
+Build a Rust API with a clear home for routes, input validation, application logic,
+and data access. Xecute adds a CLI, modules, and dependency injection on top of
+Axum, so you can start with a connected feature instead of wiring everything first.
+
+You do not need a database to get started. You should be comfortable running
+terminal commands and reading basic Rust structs and async functions.
+
+## New to Xecute? Follow this path
+
+| Step | What you will do | Guide |
+| --- | --- | --- |
+| 1 | Install the CLI, run an API, and send a valid and invalid request | [Build your first API](skills/xecute/references/getting-started/quickstart.md) |
+| 2 | Generate `/user`, change a validation rule, and run tests | [Your first feature](skills/xecute/references/getting-started/first-feature.md) |
+| 3 | Follow input from the HTTP route to storage | [How a request works](skills/xecute/references/getting-started/request-flow.md) |
+| 4 | Add your own body, URL, and query inputs | [Controllers and extractors](skills/xecute/references/http/controllers.md) |
+| 5 | Share providers between features | [Providers and modules](skills/xecute/references/architecture/modules.md) |
+
+Start with MVC, the default. Learn [CQRS](skills/xecute/references/architecture/mvc-cqrs.md) when you want
+to separate write operations from read operations. You can use the same concepts
+without adding a message bus or a second database.
+
+## Already building something?
+
+| I need to… | Go to |
+| --- | --- |
+| Understand generated files | [Project structure](skills/xecute/references/architecture/project-structure.md) |
+| Find a CLI command | [CLI reference](skills/xecute/references/cli/commands.md) |
+| Move from NestJS | [Coming from NestJS](skills/xecute/references/getting-started/coming-from-nestjs.md) |
+| Configure a port, limits, or environment | [Application configuration](skills/xecute/references/configuration/application.md) |
+| Test a route or replace a dependency in tests | [Testing modules and HTTP](skills/xecute/references/testing/modules.md) |
+| Connect PostgreSQL | [PostgreSQL](skills/xecute/references/integrations/postgres.md) |
+| Protect routes | [Guards and JWT](skills/xecute/references/integrations/auth.md) |
+| Fix a setup or startup problem | [Troubleshooting](skills/xecute/references/operations/troubleshooting.md) |
+| Update an existing generated application | [Adoption guide](skills/xecute/references/getting-started/adopting-existing.md) |
+
+## Add capabilities when you need them
+
+Lifecycle management is part of the runtime. Database, JWT authentication, jobs,
+caching, and CQRS buses are enabled through Cargo features and explicit provider
+configuration. Start with the generated API, then follow the integration guide for
+each capability. The [feature setup guide](skills/xecute/references/getting-started/status.md) explains
+what is generated and what you configure yourself.
+
+A generated resource starts with collection GET and create POST, validation, and
+an **in-memory** repository. It does not create login, database persistence,
+update/delete endpoints, background workers, or cache configuration automatically.
+
+## A few terms you will see
+
+| Term | Plain meaning |
+| --- | --- |
+| Feature | One part of your application, such as users or orders |
+| DTO | A Rust struct describing accepted request data and validation rules |
+| Provider | An object registered so Xecute can inject it where needed |
+| Module | A group of providers, with explicit imports and exports |
+| Repository | The part that reads and writes data |
+| Lifecycle | Startup and shutdown work, such as opening and closing a pool |
+
+Tutorials tell you where to run commands and what to expect. Reference pages cover
+the available APIs in more detail. The source link at the bottom identifies where
+the page is maintained; it is useful when you want to inspect implementation details.
+
+---
+
+# Build your first API
+
+Documentation route: /docs/getting-started/quickstart
+
+By the end of this guide, you will have a running Rust API, create a record, and
+see it in a response. Start with MVC; you can learn CQRS after your first feature.
+
+## 1. Check your tools
+
+You need Rust **1.98.1 or newer**, Cargo, rustfmt, and Clippy. Generated projects
+pin Rust 1.98.1 in `rust-toolchain.toml`.
+
+```sh
+rustc --version
+cargo --version
+rustup component add rustfmt clippy
+```
+
+No database, Redis, or authentication provider is needed for this tutorial.
+The generated repository stores records in memory.
+
+## 2. Install Xecute
+
+Run this from any directory:
+
+```sh
+cargo install xecute-cli --version 0.1.19 --locked
+xecute --version
+```
+
+The version command should print `xecute 0.1.19`. If the command is missing, check
+that Cargo’s `bin` directory is on your `PATH`. To replace an existing CLI install,
+add `--force` to the install command.
+
+## 3. Create a project
+
+Run this from the directory where you keep your projects:
+
+```sh
+xecute new my-api
+cd my-api
+```
+
+This creates an MVC application and an `example` feature. MVC means your HTTP
+controller calls a service, and the service calls a repository. You do not need
+to wire the generated example yourself.
+
+The generator resolves a fresh `Cargo.lock` using the latest
+compatible dependencies. Keep that file in Git. A network failure leaves the
+project files available; enter the project and retry `cargo generate-lockfile`.
+Breaking dependency versions are not automatically adopted.
+
+## 4. Start the server
+
+Keep this terminal open:
+
+```sh
+xecute run dev
+```
+
+The first build can take longer because Cargo downloads and compiles dependencies.
+The default server address is `http://127.0.0.1:3000`. The development runner
+watches source files and rebuilds when you save a change. Use `cargo run` if you
+prefer a single run without watching.
+
+Open `http://127.0.0.1:3000/docs/` for your application’s Swagger UI. This is the
+API documentation generated by your app, separate from this Xecute learning site.
+
+## 5. Send your first requests
+
+Open a **second terminal**. Keep the server running in the first one.
+
+```sh
+curl -i http://127.0.0.1:3000/example
+```
+
+Expect `200 OK` and an empty collection. Now create a record:
+
+```sh
+curl -i -X POST http://127.0.0.1:3000/example \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"My first record"}'
+```
+
+Expect `201 Created` and a record containing a generated UUID and your name.
+Run the GET request again to see the saved record. The generated middleware may
+wrap response data; use Swagger to inspect the response contract.
+
+Records disappear when the server restarts. You have not connected a database yet.
+
+## 6. Try an invalid request
+
+```sh
+curl -i -X POST http://127.0.0.1:3000/example \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"A"}'
+```
+
+Expect `422 Unprocessable Entity`. Names must contain 3–100 characters and cannot
+be whitespace only. Xecute checks the DTO before calling the controller method;
+you do not add a manual validation call to the handler.
+
+## If something does not work
+
+| What you see | What to do |
+| --- | --- |
+| `xecute: command not found` | Check Cargo’s bin directory in `PATH`, then reopen the terminal |
+| Downloads or dependency resolution fail | Check registry/network access; run `cargo generate-lockfile` in the generated app |
+| Port 3000 is already in use | Stop the other server or change the listener configuration in `config/AppConfig.toml` |
+| POST returns `415` | Add `Content-Type: application/json` |
+| POST returns `422` | Use the `name` field with 3–100 nonblank characters; remove unknown fields |
+| GET is empty after saving code | The watcher restarted the app, clearing the in-memory repository |
+
+## Next: build your own feature
+
+Continue with [Your first feature](skills/xecute/references/getting-started/first-feature.md). You will
+generate `/user`, find the right files, change a rule, and run the generated tests.
+
+---
+
+# Your first feature
+
+Documentation route: /docs/getting-started/first-feature
+
+You already have a running example API. Now add a `user` feature and learn which
+file to change for each kind of work. This guide follows an MVC project created
+in the [quick start](skills/xecute/references/getting-started/quickstart.md).
+
+## 1. Generate the feature
+
+In a terminal at your **application root**, beside `Cargo.toml`, run:
+
+```sh
+xecute g resource user
+```
+
+`g` is short for `generate`. A resource creates the connected files and registers
+the module and its routes. You do not need to add the generated router manually.
+If the development server is running, wait for its rebuild to finish.
+
+The route is singular: `/user`, not `/users`.
+
+## 2. Find the files you will use
+
+```text
+src/modules/user/
+├── module.rs           # Registers providers and exports the service
+├── controller.rs       # HTTP routes and request/response handling
+├── service.rs          # Coordinates application operations
+├── dto/mod.rs          # Accepted request fields and validation
+├── entity/mod.rs       # The record returned by your feature
+├── repository/store.rs # Stores and retrieves records
+└── tests/http.rs       # Tests requests through the feature router
+```
+
+A DTO describes input. An entity represents a record. A repository owns data
+access. A service coordinates the work. The controller connects HTTP to that work.
+For a complete directory map, see [Project structure](skills/xecute/references/architecture/project-structure.md).
+
+## 3. Create and list a user
+
+With the server running:
+
+```sh
+curl -i -X POST http://127.0.0.1:3000/user \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Munna"}'
+
+curl -i http://127.0.0.1:3000/user
+```
+
+Expect `201 Created` for POST and `200 OK` for GET. The collection should contain
+the new user. The generated repository is in memory, so restarting clears it.
+
+The generator provides **list and create**. Get-by-ID, update, delete, pagination,
+login, and database persistence are not generated endpoints.
+
+## 4. Follow one request
+
+```text
+POST /user
+  → dto/mod.rs: decode and validate CreateUserDto
+  → controller.rs: call UserService
+  → service.rs: trim the name and call UserRepository
+  → repository/store.rs: save the record
+  → controller.rs: return 201 and the record
+```
+
+Open these files in this order. Notice that the controller has an
+`Arc<UserService>` field: Xecute injects the registered service. The service has
+an `Arc<UserRepository>` field for the same reason.
+
+## 5. Change a validation rule
+
+Open `src/modules/user/dto/mod.rs`. The generated name rule currently allows
+3–100 characters. Change the maximum from `100` to `50` in **both** attributes:
+
+```rust
+#[schemars(length(min = 3, max = 50))]
+#[validate(length(min = 3, max = 50), custom(function = "non_blank"))]
+```
+
+This is an attribute fragment: replace the two attributes on the existing `name`
+field, keeping its type and the generated `non_blank` function.
+
+`validate` enforces the rule at runtime. `schemars` describes it in the API schema.
+Keeping both in sync makes Swagger match what the server accepts.
+
+Save the file and wait for the rebuild. Send a 51-character name:
+
+```sh
+curl -i -X POST http://127.0.0.1:3000/user \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"123456789012345678901234567890123456789012345678901"}'
+```
+
+Expect `422`. A valid name such as `Munna` should still return `201`.
+
+## 6. Run the tests
+
+From the application root:
+
+```sh
+cargo test user
+cargo fmt --all -- --check
+```
+
+The generated HTTP tests cover the feature router. Add a test for your new
+51-character rejection beside those tests; check the status and verify that
+invalid input did not create a record. See [Testing modules and HTTP](skills/xecute/references/testing/modules.md)
+for request assertions and provider overrides.
+
+## Where should my next change go?
+
+| I want to… | Start here |
+| --- | --- |
+| Accept another JSON field | `dto/mod.rs`; then pass it through the service and storage as needed |
+| Add a URL parameter or query filter | `controller.rs` and a DTO in `dto/mod.rs` |
+| Add an application operation | `service.rs` |
+| Change how data is saved | `repository/store.rs` |
+| Use a provider from another feature | `module.rs` imports and the owning module’s exports |
+| Protect a route | [Guards and JWT](skills/xecute/references/integrations/auth.md), following its feature setup |
+
+## Using CQRS instead?
+
+In a new project, select CQRS before generating resources:
+
+```sh
+xecute new query-api --cqrs
+cd query-api
+xecute g resource user
+```
+
+The controller calls `CreateUserHandler` and `ListUserHandler` instead of a
+`UserService`. Look in `commands/create.rs` and `queries/list.rs`. DTOs, repositories,
+and HTTP validation follow the same ideas. Read [MVC and CQRS](skills/xecute/references/architecture/mvc-cqrs.md)
+when you want to understand that choice.
+
+Next, learn [How a request works](skills/xecute/references/getting-started/request-flow.md) and then
+[Controllers and extractors](skills/xecute/references/http/controllers.md).
+
+---
+
+# How a request works
+
+Documentation route: /docs/getting-started/request-flow
+
+Use this page as a map when reading generated code. You need only the
+[example application](skills/xecute/references/getting-started/quickstart.md) to follow along.
+
+## The five pieces
+
+| Piece | Its job | Example in the user feature |
+| --- | --- | --- |
+| DTO | Describe and validate request data | `CreateUserDto` accepts a name |
+| Controller | Match an HTTP route and return a response | POST `/user` calls the service |
+| Service or handler | Coordinate one application operation | Normalize input and ask the repository to save |
+| Repository | Read and write data | Save a record in the generated in-memory store |
+| Module | Register providers and control visibility | Make the service available for injection |
+
+Dependency injection (DI) means Xecute creates registered objects and passes their
+dependencies through typed fields. `Arc<UserService>` is a shared reference to a
+service, not a new service constructed for every call.
+
+## Example: a valid POST
+
+1. The server receives POST `/user` with a JSON body.
+2. Server middleware applies configured HTTP policies.
+3. The route extractor decodes `CreateUserDto` and checks its validation rules.
+4. The controller calls the service (MVC) or command handler (CQRS).
+5. The operation calls the repository, which creates a record.
+6. The controller returns `201 Created` with that record; response middleware can wrap it.
+
+```text
+MVC:  HTTP → DTO → Controller → Service → Repository
+CQRS: HTTP → DTO → Controller → Command/Query Handler → Repository
+```
+
+A GET list request has no JSON body to validate. Its query parameters are only
+validated if you add a query DTO and use `#[query]`.
+
+## Example: an invalid POST
+
+Send `{"name":"A"}` to a generated create endpoint. JSON decoding succeeds,
+but name validation fails. You receive `422` before the controller method or
+repository runs. A malformed JSON document instead returns `400`; a missing JSON
+content type returns `415`.
+
+This validation belongs to HTTP extraction. Calling a service directly in Rust
+does not automatically validate a DTO. Enforce business invariants in your
+application/domain logic wherever they are required.
+
+## Decide where a value comes from
+
+| Request value | Handler input | Example |
+| --- | --- | --- |
+| JSON body | `#[body] payload: CreateUserDto` | POST body `{"name":"Munna"}` |
+| URL segment | `#[param] id: u64` | `/user/42` with `#[get("/{id}")]` |
+| Query string | `#[query] query: SearchQuery` | `/user?limit=10` |
+| Headers | `headers: axum::http::HeaderMap` | Read `Authorization` or another header |
+| URL-encoded form | `form: axum::extract::Form<ContactForm>` | HTML form submission |
+| Raw text or bytes | `String` or `axum::body::Bytes` | A plain-text or binary body |
+
+These are parameter fragments, not extra routes already generated by the CLI.
+Put reusable DTO structs in `dto/mod.rs`; import them into the controller.
+`#[body]` and `#[query]` DTOs need `Deserialize`, `Validate`, and `JsonSchema`.
+A form DTO needs `Deserialize`; form validation must be called explicitly.
+
+Use only one body-consuming extractor per handler, placed last. JSON, forms,
+raw text, raw bytes, and multipart all consume the request body. Headers, path,
+and query values can be used alongside that one body extractor.
+
+## What a module import does
+
+If `OrderService` needs `UserService`, the user module must export `UserService`
+and the order module must import the user module. Both module definitions must
+be registered in the application graph.
+
+An import grants visibility; it does not automatically discover modules or mount
+routes. The resource generator handles registration for generated features.
+Manual assembly needs explicit definitions and routers.
+
+Next, use [Controllers and extractors](skills/xecute/references/http/controllers.md) for handler code,
+[DTO validation](skills/xecute/references/http/validation.md) for rules, or
+[Providers and modules](skills/xecute/references/architecture/modules.md) for cross-feature injection.
+
+---
+
+# Features and setup
+
+Documentation route: /docs/getting-started/status
+
+Xecute gives you a working API first. Add database access, authentication,
+background processing, caching, and buses as your application needs them.
+Most integrations are opt-in so you control dependencies and configuration.
+
+## What is generated and what do I configure?
+
+| Capability | Generated behavior | Your setup |
+| --- | --- | --- |
+| MVC resources | Controller → service → repository | Default; add your application logic |
+| CQRS resources | Controller → handler → repository | Choose `--cqrs` when creating the project |
+| Request validation | Create DTO in `dto/mod.rs` | Add fields and validation rules |
+| Search/path/form inputs | Input examples in controller comments | Add DTOs and route handlers |
+| Module imports | Imports section and usage guide | Export shared providers and register module definitions |
+| Lifecycle | Synchronous startup helpers | Use async startup and cleanup for async resources |
+| PostgreSQL | In-memory repository | Enable `postgres`; configure pool, migrations, SQL repository |
+| JWT authentication | Public resources | Enable `auth`; configure trusted verification and guards |
+| Background jobs | No worker created automatically | Enable `jobs`; register queue, handlers, and shutdown |
+| Caching | No automatic response caching | Enable `cache` or `cache-redis`; define keys and TTLs |
+| CQRS buses/events | Direct handler calls | Enable `cqrs`; register buses and handlers |
+
+## Enable a capability
+
+For example, enable authentication and CQRS buses in your application manifest:
+
+```toml
+[dependencies]
+xecute = { version = "0.1", features = ["auth", "cqrs"] }
+
+[dev-dependencies]
+xecute = { version = "0.1", features = ["testing"] }
+```
+
+Merge the flags with your existing dependency declaration. In a Cargo workspace,
+set the version in `[workspace.dependencies]` and select features on inherited
+application dependencies. Keep `Cargo.lock` committed for reproducible builds.
+
+Feature flags expose APIs. They do not create credentials, connect external
+services, replace repositories, or protect routes automatically. Follow the
+[feature reference](skills/xecute/references/reference/features.md) and the relevant integration guide.
+
+## Updating an existing application
+
+Updating the CLI changes the executable used for future generation. It does not
+rewrite existing source files or migrate application startup.
+
+Use the [adoption guide](skills/xecute/references/getting-started/adopting-existing.md) to add capabilities
+one at a time, including provider registration, startup, shutdown, and tests.
+
+---
+
+# Upgrade an existing application
+
+Documentation route: /docs/getting-started/adopting-existing
+
+Enable and integrate one capability at a time, keeping the application compiling
+and its existing HTTP tests passing. Installing a newer CLI does not rewrite app
+files; this guide covers the explicit migration work.
+
+## 1. Enable the runtime features
+
+In a standalone app, merge the required flags into the existing runtime dependency:
+
+```toml
+[dependencies]
+xecute = { version = "0.1", features = ["auth", "postgres", "jobs", "cache-redis", "cqrs"] }
+```
+
+Choose only the flags you use. For memory caching select `cache` rather than
+`cache-redis`. Async lifecycle needs no extra feature. Keep the app's test-only
+`testing` feature in dev-dependencies where appropriate.
+
+For a generated workspace, update the shared dependency once:
+
+```toml
+# Workspace Cargo.toml
+[workspace.dependencies]
+xecute = { version = "0.1" }
+
+# apps/my-api/Cargo.toml
+[dependencies]
+xecute = { workspace = true, features = ["auth", "cqrs"] }
+```
+
+Merge these fields with the existing manifests rather than replacing unrelated
+dependencies/lints. Run `cargo generate-lockfile` and commit the resulting lockfile
+with your application's dependency changes. `--runtime-path` affects generated
+projects; it does not install or select a different CLI executable.
+
+## 2. Move resource initialization to an async path
+
+Generated `AppModule::container()` is synchronous. Add an async helper alongside
+it using the existing `definitions()` registry:
+
+```rust
+pub async fn container_async() -> Result<Container, InjectError> {
+    let container = ModuleGraph::new(Self::definitions()).build()?;
+    container.initialize_async().await?;
+    Ok(container)
+}
+```
+
+Use `AppModule::container_async().await?` in server bootstrap, retain the returned
+`Arc<Container>`, and call `router_with_container(container.clone())` after startup
+completes. Router assembly remains synchronous once resources are ready.
+
+Retain the generated configuration, shared policies, version/docs routers and
+request draining. Refactor the existing post-initialization work into an async
+block returning a Result; afterward await `container.shutdown_async()` on success
+or failure, then propagate the results. The complete
+[async lifecycle guide](skills/xecute/references/architecture/lifecycle.md) and runnable examples show
+cleanup ownership. Account for early router/listener setup failures too.
+
+Application tests calling the old sync helper need an async setup path when their
+registrations include async factories or lifecycle hooks. Use
+`TestingModule::compile_async().await` for isolated provider tests.
+
+## 3. Register resources and enforce module visibility
+
+A generated `#[module]` provides static type registrations. Build its definition,
+then append configured provider definitions where needed:
+
+```rust
+let definition = UserModule::definition().provider(configured_provider);
+```
+
+Here `configured_provider` is a `ProviderDefinition` built from your validated
+configuration. Include this definition once in `AppModule::definitions()`. For a
+shared database/cache module, export the concrete provider type, import its owning
+module in consumers, and include all module definitions in the graph.
+
+Do not register a configured provider twice or re-register an imported service in
+every module. Factories must declare the dependencies they resolve. The container
+validates duplicates, cycles, module visibility and unsafe lifetime capture.
+
+## 4. Adopt each capability
+
+| Capability | App changes | Verification |
+| --- | --- | --- |
+| Lifecycle | Async factories and `on_init`/`on_shutdown` registration methods | Startup order, failed setup cleanup and shutdown |
+| PostgreSQL | Pool config, migration provider, SQL repository, readiness | Run against dedicated PostgreSQL; verify commit/rollback |
+| Authentication | Trusted verifier, controller/route guards and explicit policies | Missing/invalid JWT → 401; insufficient permissions → 403 |
+| Jobs | Typed payload, bounded queue and handler; dependency-aware cleanup | Retry, overload handling and drain accepted work |
+| Cache | Cache-aside reads and post-write invalidation | TTL, tenant/user key separation, storage failures |
+| CQRS buses | Message/handler traits, bus registration and controller mapping | One command/query handler, event failures and pipeline ordering |
+
+Read the detailed [PostgreSQL](skills/xecute/references/integrations/postgres.md),
+[auth](skills/xecute/references/integrations/auth.md), [jobs](skills/xecute/references/integrations/jobs.md),
+[cache](skills/xecute/references/integrations/cache.md), and [CQRS](skills/xecute/references/integrations/cqrs.md) guides.
+Use compiled example code as a reference; adapt repository and policy logic to
+your own application's contracts.
+
+## 5. Preserve the application boundary
+
+Keep body/query/path/form DTOs under `dto/`; controller methods import them and
+map requests to service calls, commands or queries. Put SQL in repositories,
+workflow logic in services/handlers, and configured resources in DI definitions.
+Protect private endpoints explicitly before using authorization-sensitive cache
+keys. Queues and event buses are process-local; use durable delivery/outbox
+infrastructure for work that must survive a process crash.
+
+## Verify before deployment
+
+Run the app's existing tests, add tests for each enabled capability, and check
+formatting/Clippy. Verify generated-app tests against your selected runtime version, not only
+the library's unit tests. The [example catalog](skills/xecute/references/testing/examples.md) provides
+working commands and external-service requirements.
+
+---
+
+# Coming from NestJS
+
+Documentation route: /docs/getting-started/coming-from-nestjs
+
+Xecute uses Rust and Axum with explicit registration. Several architectural ideas
+will be familiar, but NestJS decorator names do not imply matching runtime APIs.
+
+| NestJS concept | Xecute implementation |
+| --- | --- |
+| Module imports/exports | `#[module(imports = [...], providers = [...], exports = [...])]` plus all definitions in `ModuleGraph` |
+| Injectable provider | `#[derive(Injectable)]` or `#[injectable]` on a named-field struct |
+| Constructor injection | Typed fields such as `Arc<UserRepository>` |
+| Controller and HTTP methods | `#[controller]`, `#[routes]`, `#[get]`, `#[post]` and other verbs |
+| Body/query/path inputs | `#[body]`, `#[query]`, singular `#[param]`; other Axum extractors directly |
+| Validation pipe | Automatic JSON/query DTO decoding plus `validator` validation |
+| Guards / UseGuards | `#[guard(...)]` on a module, controller, or route; async functions return `Result<Request, E>` |
+| Authentication/authorization | Optional `auth` verifier, `AuthenticatedUser`, roles/permissions |
+| Request scope | `Scope::Request`, `RequestScope` and scoped controller routers |
+| Lifecycle | `singleton_async`, `on_init`, `on_shutdown`, explicit async startup/shutdown |
+| CQRS buses | Optional typed `CommandBus`, `QueryBus`, `EventBus` and `Behavior` |
+| Queues | Optional bounded in-process `JobQueue<T>`; not BullMQ/durable broker storage |
+| Cache | Explicit TTL cache API; memory/LRU or Redis; no automatic HTTP interceptor |
+
+## Choose the generated architecture
+
+MVC uses `Controller → Service → Repository`. CQRS uses
+`Controller → Command/Query Handler → Repository`. A focused domain service can be
+used by handlers when reusable logic needs it; a forwarding service is not
+mandatory. Buses are an additional explicit choice, not a requirement for CQRS.
+
+## Important differences
+
+Module imports establish visibility but do not auto-discover definitions or mount
+routes. The CLI registers resource definitions and controller routers through
+markers in `AppModule`; manual modules need both kinds of registration.
+
+Guards follow nested Axum scopes: app middleware/guards wrap controller
+middleware/guards, then route middleware/guards and extraction. This is documented
+Xecute ordering, not a promise of NestJS's universal request lifecycle.
+
+Lifecycle attribute markers such as `#[on_module_init]` remain placeholders.
+Use the provider registration methods described in the lifecycle guide. There is
+no built-in dynamic module registration convention, full HTTP interceptor system,
+ORM entity decorators, session/login scaffold or persisted saga engine.
+
+Rust APIs use concrete types and typed errors rather than reflection-based token
+lookup. `Command` and `Query` traits declare Output/Error types; event subscribers
+receive a shared `Arc<E>`. Explicit configuration and feature flags make startup
+and deployment behavior inspectable.
+
+Read [feature setup](skills/xecute/references/getting-started/status.md) before enabling integrations
+and the [adoption guide](skills/xecute/references/getting-started/adopting-existing.md) when updating an
+existing generated application.
+
+---
+
+# CLI reference
+
+Documentation route: /docs/cli/commands
+
+Use this page when you know what you want to generate and need the exact command or flag. Run resource generators beside your application’s Cargo.toml.
+
+```text
+xecute new <project|.> [--name <package-name>] [--mvc | --cqrs] [--runtime-path <path>]
+xecute update
+xecute uninstall
+xecute run dev [--bin <name>] [--features <list>] [--watch <path>] [-- <app arguments>]
+xecute generate <resource|module|controller|service> <name>
+xecute g <res|mo|co|s> <name>
+xecute --help
+xecute --version
+```
+
+| Command | Result |
+| --- | --- |
+| `xecute new my-app` | MVC application with a working example resource |
+| `xecute new .` | Initialize the current directory using its name as the package name |
+| `xecute new . --name my-app` | Initialize the current directory with an explicit package name |
+| `xecute update` | Install the latest crates.io CLI into the running CLI's Cargo installation root |
+| `xecute uninstall` | Remove the Cargo-installed CLI; application projects are retained |
+| `xecute new my-app --mvc` | Explicit MVC selection |
+| `xecute new my-app --cqrs` | Application with command/query handlers |
+| `xecute new my-project --workspace` | Cargo workspace with its first MVC application under `apps/` |
+| `xecute g apps admin [--mvc \| --cqrs]` | Add an app from the workspace root; inherit architecture unless overridden |
+| `xecute run dev` | Rebuild and restart the debug application when watched files change |
+| `xecute g resource user` or `xecute g res user` | Resource, module registration, routes, schemas, repository, and HTTP test |
+| `xecute g module billing` or `xecute g mo billing` | Registered module with an empty provider list |
+| `xecute g controller status` or `xecute g co status` | Standalone injectable controller with a GET endpoint |
+| `xecute g service mailer` or `xecute g s mailer` | Standalone injectable service |
+
+Run generators from the generated project root. Standalone controllers and
+services require manual provider/route registration when you decide to use them.
+Standalone generators remain available in both architecture modes.
+
+Names must start with a lowercase ASCII letter and contain lowercase letters,
+digits, hyphens, or underscores. Rust keywords and empty name segments are
+rejected. `user-profile` becomes the module `user_profile` and types such as
+`UserProfileController`. Existing feature paths are not overwritten.
+
+The CLI saves the architecture as `mvc` or `cqrs` in `.xecute/architecture`.
+Commit this file. Subsequent resource generation follows that selection; projects
+without it retain the legacy MVC layout. Invalid values stop generation.
+Changing the file changes future generation, not existing feature code.
+
+Keep the `// xecute:` registration markers in `src/app_module.rs`. Generators
+use them to add module imports, container definitions, routes, and API metadata.
+
+## Keep learning
+
+[Development runner](skills/xecute/references/cli/development.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Development runner
+
+Documentation route: /docs/cli/development
+
+Keep a development server running while you edit Rust files. Start with a generated application; this runner rebuilds and restarts it when watched files change.
+
+With CLI 0.1.7 or later installed, run this from your application's directory:
+
+```sh
+xecute run dev
+```
+
+The CLI starts `cargo run` in the debug profile and monitors project files. Saving
+source or configuration changes automatically stops the previous process, rebuilds,
+and restarts the application. It uses Cargo's incremental build cache; there is
+no separate watcher executable to install.
+
+```sh
+# Choose a binary in a project with several binary targets:
+xecute run dev --bin server
+
+# Also watch a local runtime or another source directory (repeatable):
+xecute run dev --watch ../xecute/xecute --watch ../xecute/xmacros
+
+# Pass arguments to the application, preserving individual argument boundaries:
+xecute run dev -- --port 4000
+```
+
+The application must implement any arguments passed after `--`; the generated
+server configures its port with `server.bind_address` in `config/AppConfig.toml` instead.
+
+The watcher polls file metadata every 200 ms and groups edits with a 300 ms quiet
+period. It detects additions, changes, removals, and rename-save operations for
+Rust, TOML, JSON, YAML, SQL, HTML, CSS, JavaScript, TypeScript, and GraphQL files,
+plus `Cargo.lock`, `.env`, and `.env.*`. An explicitly watched file can have any
+extension. Additional watch paths must exist when the command starts. Files in
+symlinked subdirectories are not followed; pass a real path with `--watch` if needed.
+
+Cargo's resolved target directory is excluded, including custom
+`CARGO_TARGET_DIR` settings. Directories named `target`, `.git`, `.hg`, `.svn`,
+`node_modules`, `dist`, `build`, `.idea`, and `.vscode` are also excluded. Runtime
+logs and ordinary data files are not watched unless their extension is in the
+list above or they are explicitly selected. Keep generated JSON/configuration
+output outside the watched source tree to avoid restart loops.
+
+Compiler diagnostics and application logs remain visible in the terminal. A
+failed build or exited app leaves the watcher running; saving another change
+retries it. An edit during compilation cancels the old process before starting
+the next build. If the project has multiple runnable binaries, select one with
+`--bin`. Dependencies outside the project tree need explicit `--watch` paths.
+
+Ctrl-C stops the watcher and its managed Cargo/application processes. On Unix,
+restarts and shutdown send SIGTERM to the process group, allow up to five seconds
+for cleanup, then force termination if necessary. On Windows, the process tree
+is terminated with `taskkill /T /F`. Dev shutdown can therefore be shorter than
+the generated server's normal production drain deadline. Application stdin is
+closed; this command is intended for development servers, not interactive programs.
+
+This is **rebuild-and-restart hot reload**: it restarts the server process, resets
+in-memory data, and does not automatically refresh the browser or patch a running
+process. Use `cargo run` for a single run and `cargo build --release --locked`
+for a production binary. Hot reload runs only when explicitly using `xecute run dev`.
+
+## Keep learning
+
+[Cargo workspaces](skills/xecute/references/cli/workspaces.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Cargo workspaces
+
+Documentation route: /docs/cli/workspaces
+
+Choose a workspace when several applications should share dependency declarations and repository tooling. A single application does not need this setup.
+
+Workspace scaffolding is available starting with CLI 0.1.14. MVC is the default:
+
+```sh
+xecute new my-project --workspace
+cd my-project
+xecute g apps admin
+xecute g apps billing --cqrs
+xecute g apps dashboard --mvc
+cargo build --workspace
+cargo test --workspace
+```
+
+The first application is created at `apps/my-project/`. Each app keeps its own
+configuration, HTTP server, feature modules, and MVC or CQRS architecture.
+Applications share the root `Cargo.lock`, `target/`, and dependency definitions
+in `[workspace.dependencies]`. App dependencies use `workspace = true`, with
+features selected per app. New applications inherit
+the workspace architecture; use `--mvc` or `--cqrs` to override it.
+`xecute new my-project --workspace --cqrs` selects CQRS for the workspace.
+
+Run resource generators and the development server inside an app:
+
+```sh
+cd apps/admin
+xecute g resource user
+xecute run dev
+```
+
+Configure distinct bind addresses in the apps' `config/AppConfig.toml` files
+when running them together. See [the CLI workspace guide](https://github.com/morshedulmunna/xecute/blob/main/xecute-cli/README.md#multiple-applications-in-a-workspace)
+for local runtime paths, container builds, and in-place initialization.
+
+## Keep learning
+
+[Update and uninstall](skills/xecute/references/cli/update.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Update and uninstall
+
+Documentation route: /docs/cli/update
+
+Update the installed CLI executable or remove it. Updating the CLI does not rewrite an application you already generated.
+
+For a CLI installed through Cargo:
+
+```sh
+xecute update
+xecute uninstall
+```
+
+`update` runs `cargo install xecute-cli --registry crates-io --locked --force` in
+the same installation root as the running executable. It updates the CLI and
+its templates; it does not edit application dependencies or regenerate existing
+projects. It requires Cargo and access to crates.io. A local/source installation
+is replaced by the published registry version, which may not include unreleased
+local features. Check the release status above before updating a development build.
+
+`uninstall` runs `cargo uninstall xecute-cli` against that same root. It removes
+the installed CLI, including installations created with `cargo install --root`.
+It does not remove application directories, source code, or the Cargo toolchain.
+
+The CLI verifies Cargo's `.crates2.json` installation metadata before invoking
+these commands. Executables run directly from `target/debug` or copied outside a
+registered installation are rejected with guidance to use Cargo directly.
+Unix commands wait for Cargo and report failures. On Windows, a PowerShell helper
+waits for the running executable to exit before starting Cargo; its terminal
+output reports completion or errors after the CLI returns.
+
+To initialize an existing directory without creating a nested folder:
+
+```sh
+mkdir my-api
+cd my-api
+xecute new .
+xecute run dev
+
+# Optional package name, architecture, and local runtime:
+xecute new . --name my-api --cqrs --runtime-path /absolute/path/to/xecute/xecute
+```
+
+The final example is an alternative initialization command for an uninitialized
+directory. The default package name comes from the current directory's basename;
+use `--name` if the basename contains spaces, uppercase letters, or other invalid
+characters. `--name` can also override a named project's Cargo package name.
+MVC remains the default, and `--cqrs` selects CQRS.
+
+In-place generation checks all scaffold destinations before writing. Conflicting
+files such as `Cargo.toml`, `README.md`, or `.gitignore` cause a clear error with
+no scaffold files changed. Move those conflicting files or choose a fresh directory
+before retrying. Unrelated files and an existing `.git` directory are preserved.
+Symlinked scaffold parents are rejected. Generation does not change the shell's
+working directory and does not print an extra `cd` step for `new .`.
+
+## Keep learning
+
+[Choose your next guide](skills/xecute/references/index.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Project structure
+
+Documentation route: /docs/architecture/project-structure
+
+Use this directory map to find the file you need to edit. Start in src/modules for feature work; use src/server for shared HTTP behavior.
+
+A generated MVC project contains:
+
+```text
+my-app/
+├── .xecute/architecture
+├── config/
+│   └── AppConfig.toml
+├── .env.example
+├── Cargo.toml
+├── Cargo.lock
+├── rust-toolchain.toml
+├── rustfmt.toml
+├── clippy.toml
+├── deny.toml
+├── Dockerfile
+├── .github/workflows/ci.yml
+└── src/
+    ├── main.rs
+    ├── app_module.rs
+    ├── middleware.rs           # Global middleware hook
+    ├── configs/               # Validated TOML settings and secret readers
+    ├── server/
+    │   ├── bootstrap.rs       # Listener and graceful shutdown
+    │   ├── router.rs          # Shared HTTP policies and probes
+    │   ├── docs.rs            # Swagger/OpenAPI endpoints
+    │   ├── error.rs           # Public error envelope
+    │   ├── health.rs
+    │   ├── logging.rs
+    │   ├── rate_limit.rs
+    │   ├── shutdown.rs
+    │   └── middleware/        # Built-in guards, logging, response handling
+    ├── modules/
+    │   ├── mod.rs
+    │   └── example/
+    │       ├── mod.rs
+    │       ├── module.rs
+    │       ├── controller.rs
+    │       ├── service.rs
+    │       ├── dto/mod.rs
+    │       ├── entity/mod.rs
+    │       ├── repository/
+    │       │   ├── mod.rs
+    │       │   └── store.rs
+    │       └── tests/
+    │           ├── mod.rs
+    │           └── http.rs
+    └── tests/                 # Shared server HTTP tests
+```
+
+Feature filenames are `controller.rs`, `module.rs`, and `service.rs`; the Rust
+type names retain the feature prefix. Resource HTTP tests live in
+`src/modules/<feature>/tests/http.rs`.
+
+## Keep learning
+
+[MVC and CQRS](skills/xecute/references/architecture/mvc-cqrs.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# MVC and CQRS
+
+Documentation route: /docs/architecture/mvc-cqrs
+
+MVC uses a service to coordinate operations. CQRS gives each read or write its own handler. Both use DTOs and repositories; start with MVC if you are unsure.
+
+MVC is the default resource layout:
+
+```text
+Request → DTO validation → Controller → Service → Repository → Response
+```
+
+Create a CQRS project with:
+
+```sh
+xecute new my-api --cqrs
+cd my-api
+xecute g resource user
+```
+
+Its resource uses command/query handlers that inject the repository:
+
+```text
+src/modules/user/
+├── controller.rs
+├── module.rs
+├── mod.rs
+├── commands/
+│   ├── mod.rs
+│   └── create.rs    # CreateUserCommand + CreateUserHandler
+├── queries/
+│   ├── mod.rs
+│   └── list.rs      # ListUserQuery + ListUserHandler
+├── dto/mod.rs
+├── entity/mod.rs
+└── repository/
+    ├── mod.rs
+    └── store.rs
+```
+
+```text
+POST → DTO validation → Controller → CreateUserHandler → Repository write
+GET  → Controller → ListUserHandler → Repository read
+```
+
+Controllers construct command/query inputs and invoke handlers through direct
+dependency injection. The command handler coordinates writes and normalizes input;
+the query handler reads records. Both inject the same singleton repository, so
+writes are visible to subsequent reads. The module registers the repository and
+exports its handlers. Add a focused business service when an operation needs
+reusable domain logic. MVC keeps its existing `service.rs` layout.
+
+Existing CQRS features are preserved; migrate their handlers and DI registrations
+manually to adopt this layout.
+
+Initial resources implement collection GET and create POST. Update, delete,
+get-by-ID, pagination, and their handlers are application extensions. CQRS does
+not require separate databases, event sourcing, events, or a message bus; these
+are not generated automatically.
+
+## Keep learning
+
+[Providers and modules](skills/xecute/references/architecture/modules.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Providers and modules
+
+Documentation route: /docs/architecture/modules
+
+Learn how Xecute creates dependencies and shares them between features. First understand the controller → service → repository flow; then read registration, imports, and exports below.
+
+Use `#[derive(Injectable)]` for named-field structs. Dependency fields are resolved
+from the container; use `Arc<T>` to share a registered provider. Initialize local
+state with `#[inject(default)]` rather than registering that state as a provider:
+
+```rust
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use xecute::Injectable;
+
+#[derive(Injectable)]
+pub struct UserRepository {
+    #[inject(default)]
+    names: RwLock<Vec<String>>,
+}
+
+#[derive(Injectable)]
+pub struct UserService {
+    repository: Arc<UserRepository>,
+}
+```
+
+The `#[injectable]` struct attribute is also supported. Modules define provider
+registrations, imports, and exports:
+
+```rust
+use xecute::module;
+use super::{UserController, UserService};
+use super::repository::UserRepository;
+
+#[module(
+    providers = [UserRepository, UserService, UserController],
+    controllers = [UserController],
+    exports = [UserService],
+)]
+pub struct UserModule;
+```
+
+Register controllers in `providers`; the `controllers` list does not replace
+provider registration. Module metadata alone does not mount HTTP routes. The
+resource generator also registers module definitions and controller routers in
+`AppModule`. For manual assembly, pass all module definitions to
+`ModuleGraph::new(...).build()`, resolve controllers, and merge their routers.
+
+Import an owning module to use its exported providers from another module.
+Startup validation detects missing registrations, duplicates, circular
+relationships, invalid imports/exports, and inaccessible private providers.
+
+For a small manually assembled container:
+
+```rust
+let container = xecute::Container::builder()
+    .injectable::<UserRepository>()
+    .injectable::<UserService>()
+    .build()?;
+let service = container.resolve::<UserService>()?;
+```
+
+| Scope | Behavior |
+| --- | --- |
+| `singleton` | Default; one instance for the container lifetime |
+| `transient` | A new instance for each resolution |
+| `request` | Reused within one HTTP request or an explicit request container |
+
+Select a lifecycle with `#[scope("transient")]` or `#[scope("request")]` below
+`#[derive(Injectable)]`. Singleton-to-request dependencies are rejected, including
+transitive relationships. Generated routing creates request contexts automatically;
+explicit `container.request()` contexts are available for jobs and tests.
+
+## Keep learning
+
+[Feature folders](skills/xecute/references/architecture/feature-folders.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Feature folders
+
+Documentation route: /docs/architecture/feature-folders
+
+Keep one feature’s request types, records, storage, and tests together. Use this guide when your feature starts growing beyond its controller.
+
+All newly generated resources and standalone modules, controllers, and services
+live under `src/modules/<feature>/`. Each resource keeps its controller, DI module,
+DTOs, entities, repository, and HTTP tests together. CQRS resources also contain
+commands and queries. `src/modules/mod.rs` declares each feature;
+`AppModule` imports and mounts it through `crate::modules::<feature>`.
+
+```text
+src/
+├── app_module.rs
+├── modules/
+│   ├── mod.rs
+│   └── user/
+│       ├── mod.rs
+│       ├── module.rs
+│       ├── controller.rs
+│       ├── commands/
+│       ├── queries/
+│       ├── dto/
+│       ├── entity/
+│       ├── repository/
+│       └── tests/
+│           ├── mod.rs
+│           └── http.rs
+└── tests/                 # Shared server/infrastructure tests
+```
+
+MVC resources use `service.rs` inside their feature folder instead of CQRS
+commands/queries/services directories. This layout is available starting with
+CLI 0.1.9; existing root-level features are preserved rather than moved.
+
+## Keep learning
+
+[Provider scopes](skills/xecute/references/architecture/scopes.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Provider scopes
+
+Documentation route: /docs/architecture/scopes
+
+Choose how long an injected provider lives. Start with the generated singleton behavior; use request or transient scopes only when your application needs a different lifetime.
+
+| Scope | Lifetime |
+| --- | --- |
+| Singleton (default) | One instance per application container, shared across requests |
+| Request | One instance per request context, shared across nested dependencies |
+| Transient | A new instance on every resolution |
+
+```rust
+use std::sync::Arc;
+use xecute::{Injectable, controller, routes};
+
+#[derive(Injectable)]
+#[scope("request")]
+struct RequestContext {
+    #[inject(default)]
+    state: std::sync::Mutex<Vec<String>>,
+}
+
+#[controller("/example-scope")]
+#[derive(Injectable)]
+#[scope("request")]
+struct ExampleController {
+    context: Arc<RequestContext>,
+}
+
+#[routes]
+impl ExampleController {
+    #[get("")]
+    async fn get(&self) -> &'static str {
+        let _ = &self.context;
+        "request scope is active"
+    }
+}
+```
+
+Register both types in a module's providers. Generated `AppModule` uses
+`Controller::scoped_router(container.clone())`, creating a request context before
+controller middleware and extractors. Nested factories resolve against that same
+context. Use a named parameter `context: xecute::Inject<RequestContext>` in a
+controller method, or `Inject<T>` in a plain Axum handler, to resolve explicitly.
+Plain routers need `xecute::with_container(router, Arc<Container>)`.
+To resolve providers in app-level middleware, wrap the fully assembled middleware
+pipeline with `with_container` as well. Matching nested boundaries reuse the same
+request cache; mixing different container registries in one boundary returns a
+safe 500 instead of resolving from the wrong application.
+`Controller::router(Arc<Controller>)` remains available for explicitly supplied
+controller instances; it cannot recreate their captured dependencies per request.
+
+Use `container.request()` for jobs or tests requiring an explicit scope. Its
+clones share a request cache; a second call creates an independent cache. Request
+cache ownership is released at completion/cancellation, but any Arc retained by
+application code keeps its value alive. `RequestContainer<'a>` remains a
+compatibility alias for the owned `RequestScope`.
+
+Startup rejects missing required registrations, duplicate providers/modules,
+cycles, private module dependencies, and singleton-to-request dependencies even
+through transient providers. Optional providers may be absent, but failures
+constructing a registered optional provider propagate. Factories must declare
+all dependencies; undeclared resolutions fail instead of risking recursive cache
+deadlocks. Custom definitions can mark a declared dependency optional with
+`.optional_dependency::<T>()`.
+
+Concurrent resolutions initialize each singleton/request provider once. Factory
+errors are cached for that scope; recover external connectivity inside a shared
+client instead of expecting factory retries. `container.initialize()` eagerly
+constructs singletons and is called before generated applications listen.
+Factories are synchronous: initialize asynchronous SDK/database clients at
+startup and register their handles as values. A transient injected into a
+singleton is created when that singleton is built, then retained by it.
+
+## Keep learning
+
+[Async startup and shutdown](skills/xecute/references/architecture/lifecycle.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Async startup and shutdown
+
+Documentation route: /docs/architecture/lifecycle
+
+Use lifecycle hooks when resources must connect before requests start and close after work drains. Follow the async startup path below; attribute markers alone do not execute hooks.
+
+Register asynchronous resources with `ProviderDefinition::singleton_async`, then
+await `container.initialize_async()` before binding or serving HTTP. Factories
+receive an owned `Container`, so they can await connection setup and resolve
+**declared** dependencies after await points. Dependencies and their startup hooks
+finish before dependent factories run. Existing synchronous factories and derived
+providers can depend on these initialized resources without changing their APIs.
+
+```rust
+use xecute::{Container, InjectError, ProviderDefinition};
+
+struct Connection;
+impl Connection {
+    async fn connect() -> Result<Self, InjectError> { Ok(Self) }
+    async fn close(&self) -> Result<(), InjectError> { Ok(()) }
+}
+
+async fn example() -> Result<(), InjectError> {
+let container = Container::builder()
+    .provider(
+        ProviderDefinition::singleton_async::<Connection, _, _>(vec![], |_| async {
+            Connection::connect().await
+        })
+        .on_init::<Connection, _, _>(|connection| async move {
+            // Optional readiness checks or resource warm-up.
+            let _ = connection;
+            Ok(())
+        })
+        .on_shutdown::<Connection, _, _>(|connection| async move {
+            connection.close().await
+        }),
+    )
+    .build()?;
+
+container.initialize_async().await?;
+let connection = container.resolve::<Connection>()?;
+// Serve requests, then stop accepting work and drain outstanding requests.
+container.shutdown_async().await?;
+let _ = connection;
+Ok(())
+}
+```
+
+Use `.on_init::<YourType, _, _>(...)` and `.on_shutdown::<YourType, _, _>(...)`
+on a synchronous provider definition as well, including `YourType::definition()`.
+The hook type must match the registered provider type. Hooks are singleton-only;
+request and transient factories keep their existing resolution behavior. Sync
+`initialize()` reports `AsyncInitializationRequired` when async factories or
+hooks need startup. It remains usable after async startup completes.
+
+Clones share lifecycle state. Concurrent initialization runs factories and hooks
+once; shutdown runs cleanup in reverse dependency order. Startup failures clean
+up already constructed resources, including a resource whose init hook failed,
+then return and cache the original startup error. Cleanup continues if a hook
+returns an error; explicit shutdown returns the first cleanup error. A factory
+that fails before returning owns cleanup of its partially constructed resources.
+
+Shutdown is explicit: dropping a container does not execute async hooks. After
+startup cancellation, call `shutdown_async()` to clean constructed resources;
+startup cannot be retried on that container. Cancelled shutdown can be resumed,
+but the interrupted hook is not retried. Keep cleanup hooks bounded and avoid
+cancelling them when possible. Hooks and factories must not call lifecycle
+methods recursively on the same container. Existing `Arc` references remain
+accessible after cleanup; finish application work before shutting down.
+
+For module-based applications, attach definitions with
+`ModuleDefinition::provider(...)`, then build with `ModuleGraph` as usual.
+For generated applications using async resources, build the container from
+`AppModule::definitions()` and await initialization before calling
+`AppModule::router_with_container(container.clone())`; the synchronous
+`AppModule::container()` helper cannot initialize async resources. Retain a
+container clone for cleanup after graceful request draining, including startup
+errors after initialization (for example, a failed listener bind).
+
+With the `testing` feature, use `TestingModule::compile_async().await` and call
+`shutdown_async()` when the test finishes. Provider overrides replace factories
+and hooks together. Existing lifecycle attribute markers such as
+`#[on_module_init]` remain placeholders; use the executable registration methods
+above.
+
+Run `cargo run -p xecute --example async_lifecycle` for a complete example with
+async connection setup, a synchronous dependent service, and explicit cleanup.
+
+## Keep learning
+
+[Choose your next guide](skills/xecute/references/index.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Controllers and extractors
+
+Documentation route: /docs/http/controllers
+
+A controller connects an HTTP request to an application operation. Use the example below inside a generated user feature, then choose body, path, or query inputs from the extractor table.
+
+Use `#[controller]` on the struct and `#[routes]` on its inherent impl. An MVC
+resource controller can use the generated service and DTO as follows:
+
+```rust
+//! HTTP endpoints for the user feature.
+
+use std::sync::Arc;
+use xecute::prelude::*;
+use super::{dto::CreateUserDto, entity::User, service::UserService};
+
+#[controller("/user")]
+#[derive(Injectable)]
+/// User collection and creation endpoints.
+pub struct UserController {
+    service: Arc<UserService>,
+}
+
+#[routes]
+impl UserController {
+    #[get("")]
+    #[api(summary = "List users", tag = "Users", operation_id = "listUsers")]
+    #[resp(200, "Current users", json = Vec<User>)]
+    async fn list(&self) -> Json<Vec<User>> {
+        Json(self.service.list().await)
+    }
+
+    #[post("")]
+    #[body(json = CreateUserDto)]
+    #[resp(201, "User created", json = User)]
+    #[resp(422, "Invalid payload")]
+    #[resp(503, "Repository capacity exhausted")]
+    async fn create(
+        &self,
+        #[body] payload: CreateUserDto,
+    ) -> Result<(HttpStatus, Json<User>), HttpError> {
+        let user = self.service.create(payload).await
+            .map_err(|_| HttpError::new(HttpStatus::SERVICE_UNAVAILABLE))?;
+        Ok((HttpStatus::CREATED, Json(user)))
+    }
+}
+```
+
+Supported HTTP annotations are `#[get]`, `#[post]`, `#[put]`, `#[patch]`,
+`#[delete]`, `#[head]`, and `#[options]`. A handler has one HTTP annotation.
+Prefixes and nonempty route suffixes must start with `/`.
+
+| Parameter | Meaning |
+| --- | --- |
+| `#[body] payload: CreateUserDto` | Decode JSON and validate the DTO |
+| `#[query] filter: SearchDto` | Decode the query string and validate the DTO |
+| `#[param] id: String` | Extract an Axum path parameter, e.g. `#[get("/{id}")]` |
+| `identity: axum::Extension<Identity>` | Use an Axum extractor directly |
+
+Receiver handlers use `&self`, simple parameter names, and async, non-generic
+methods. Only one JSON body parameter is supported. When using ordinary Axum
+extractors, place any body-consuming extractor last. `#[body]` is moved to the
+last extractor position automatically.
+
+`Controller::router(Arc<Controller>)` builds its Axum router.
+`Controller::api_operations()` returns documentation metadata. The older
+`#[controller("/prefix")] impl Controller` syntax remains supported.
+
+## Keep learning
+
+[DTO validation](skills/xecute/references/http/validation.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# DTO validation
+
+Documentation route: /docs/http/validation
+
+Put request rules in DTO structs under dto/mod.rs. Read the example, then use the status table to understand which requests are rejected before your handler runs.
+
+Validation uses the `validator` crate directly. Generated request DTOs derive
+`Deserialize`, `Validate`, and `JsonSchema`, and reject unknown fields:
+
+```rust
+//! User request contracts and validation rules.
+
+use schemars::JsonSchema;
+use serde::Deserialize;
+use validator::{Validate, ValidationError};
+
+#[derive(Deserialize, Validate, JsonSchema)]
+#[serde(deny_unknown_fields)]
+/// Validated input for user creation.
+pub struct CreateUserDto {
+    /// Display name containing 3–100 characters and non-whitespace content.
+    #[schemars(length(min = 3, max = 100))]
+    #[validate(length(min = 3, max = 100), custom(function = "non_blank"))]
+    pub name: String,
+}
+
+fn non_blank(value: &str) -> Result<(), ValidationError> {
+    if value.trim().is_empty() {
+        return Err(ValidationError::new("name must not be blank"));
+    }
+    Ok(())
+}
+```
+
+`#[body]` and `#[query]` run validation at the controller's extraction boundary.
+You do not call `.validate()` manually in the controller. Invalid input returns
+an HTTP response before the controller method, service, command handler, or
+repository runs. Middleware already entered can still process that response.
+Direct calls to services or command handlers bypass HTTP extraction; enforce any
+required domain invariants at those entry points too.
+
+| Input failure | HTTP status |
+| --- | --- |
+| Malformed JSON syntax | `400 Bad Request` |
+| Missing JSON fields, wrong field types, unknown fields, failed DTO rules | `422 Unprocessable Entity` |
+| Missing/unsupported JSON content type | `415 Unsupported Media Type` |
+| Query decoding failure | `400 Bad Request` |
+| Query DTO validation failure | `422 Unprocessable Entity` |
+| Oversized request body | `413 Payload Too Large` |
+
+The generated server normalizes failures to a safe JSON envelope:
+
+```json
+{
+  "error": {
+    "code": "validation_failed",
+    "message": "Invalid request data",
+    "request_id": "<request UUID>"
+  }
+}
+```
+
+Responses include `X-Request-Id`. Public validation errors do not expose submitted
+values or field-level validation details. Use explicit domain-error mappings to
+`HttpError` for safe application messages. The runtime produces JSON errors; the
+generated middleware supplies correlation IDs and normalizes other failures.
+
+## Keep learning
+
+[Middleware](skills/xecute/references/http/middleware.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Middleware
+
+Documentation route: /docs/http/middleware
+
+Middleware wraps requests and responses around a handler. Use it for shared HTTP behavior; follow the execution order below before combining application, controller, and route middleware.
+
+This section requires runtime/macros 0.1.5 or later; see [release status](#release-status).
+
+Middleware functions accept `Request` and `Next` from `xecute::middleware` and
+return a response or another `IntoResponse` value. Call `next.run(request).await`
+to continue. Return directly to stop further middleware, validation, and handler
+execution.
+
+## App-level middleware
+
+The generator creates `src/middleware.rs`. Replace its default configuration
+with a middleware registration, for example:
+
+```rust
+use xecute::{Application, middleware::{Request, Next, Response}};
+
+pub fn configure(app: Application) -> Application {
+    app.use_middleware(audit)
+}
+
+pub async fn audit(request: Request, next: Next) -> Response {
+    let mut response = next.run(request).await;
+    response.headers_mut().insert("x-audited", "true".parse().unwrap());
+    response
+}
+```
+
+The generated server invokes this hook for application routes, documentation,
+health probes, and unmatched URLs. Request logging and response normalization
+wrap the hook, including its early error responses. A global authentication
+policy must explicitly allow any public endpoints it needs, such as probes.
+
+Existing projects can wrap their assembled router directly:
+
+```rust
+let app = xecute::Application::new(router)
+    .use_middleware(audit)
+    .use_middleware(metrics)
+    .into_router();
+```
+
+Add routes before constructing/finalizing this pipeline. Only routes and
+fallbacks already present are wrapped. Global registrations can be closures
+capturing shared state such as `Arc<YourDependency>`.
+
+## Controller-level middleware
+
+Place middleware below the controller attribute:
+
+```rust
+#[controller("/user")]
+#[middleware(crate::middleware::audit)]
+#[derive(Injectable)]
+/// User collection and creation endpoints.
+pub struct UserController {
+    service: Arc<UserService>,
+}
+```
+
+It runs for every matched route belonging to that controller. It does not run
+for unrelated URLs that return 404.
+
+Controller middleware can also be declared on the routing impl:
+
+```rust
+#[routes]
+#[middleware(crate::middleware::audit)]
+impl UserController {
+    // HTTP handlers...
+}
+```
+
+If the controller has both struct and impl middleware, struct middleware wraps
+impl middleware. Use the standard `#[controller]` struct plus `#[routes]` impl
+form when combining controller metadata and middleware.
+
+## Route-level middleware
+
+Place middleware on a handler inside a `#[routes]` impl:
+
+```rust
+#[routes]
+impl UserController {
+    #[get("")]
+    #[middleware(crate::middleware::audit)]
+    async fn list(&self) -> Json<Vec<User>> {
+        Json(self.service.list().await)
+    }
+}
+```
+
+This middleware applies only to that HTTP method and route. It does not attach
+to a POST handler sharing the same path.
+
+An early-return middleware can reject a request without invoking the controller:
+
+```rust
+use xecute::middleware::{Request, Next};
+
+async fn temporarily_unavailable(_: Request, _: Next) -> axum::http::StatusCode {
+    axum::http::StatusCode::SERVICE_UNAVAILABLE
+}
+```
+
+## Execution order
+
+```text
+Request:
+  App middleware → Controller struct middleware → Controller impl middleware
+  → Route middleware → Extraction/validation → Handler
+
+Response:
+  Handler/rejection → Route → Controller impl → Controller struct → App
+```
+
+Within a scope, declaration order is execution order:
+
+```rust
+#[middleware(first, second)]
+// Equivalent ordering to consecutive #[middleware(first)] and #[middleware(second)].
+```
+
+The response unwinds in reverse order. A short-circuit skips later middleware
+and the handler; earlier middleware can still inspect or modify its response.
+
+Keep `#[controller]` and `#[routes]` above their middleware annotations so the
+owning macros process them. Empty middleware lists and middleware on methods
+without an HTTP route attribute are rejected. Controller/route annotations take
+function paths; use app-level closures or request extensions for shared state.
+These are HTTP middleware, not automatic CQRS handler pipelines.
+
+## Keep learning
+
+[Swagger and OpenAPI](skills/xecute/references/http/openapi.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Swagger and OpenAPI
+
+Documentation route: /docs/http/openapi
+
+Use Swagger to try endpoints and OpenAPI to describe their contract. Start with the generated /docs/ endpoint, then add metadata when you add routes or change DTOs.
+
+Every generated project includes embedded Swagger UI at `/docs/` and an OpenAPI
+3.1 document at `/docs/openapi.json`. Resource generation adds each controller's
+operations automatically. Set `docs.enabled = false` in `config/AppConfig.toml` to disable both routes.
+
+| Annotation | Purpose |
+| --- | --- |
+| `#[api(summary = "...", tag = "...", operation_id = "...")]` | Describe an endpoint and its operation ID |
+| `#[body(json = RequestDto)]` | Declare the JSON body type; it must match the `#[body]` parameter |
+| `#[resp(201, "Created", json = ResponseDto)]` | Describe a response and schema |
+| `#[resp(422, "Invalid payload")]` | Describe a response without a JSON schema |
+
+DTOs and response entities derive `schemars::JsonSchema`. Keep schema constraints
+such as `#[schemars(length(...))]` aligned with validation attributes. Schema
+generation describes data; it does not itself validate requests. API metadata
+does not change the HTTP status returned by a handler.
+
+For manual documentation assembly, use `Controller::api_operations()` with
+`xecute::openapi_document(title, version, operations)`.
+
+## Keep learning
+
+[Errors and domain mappings](skills/xecute/references/http/errors.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Errors and domain mappings
+
+Documentation route: /docs/http/errors
+
+Turn application failures into safe HTTP responses. Choose a status and public message deliberately; keep internal errors out of the response.
+
+Handlers and services can return typed domain errors. Map expected failures
+explicitly using `From<DomainError> for HttpError`; controllers returning
+`Result<T, HttpError>` can then use `?`.
+
+```rust
+use xecute::{HttpError, HttpStatus};
+
+struct EmailTaken;
+impl From<EmailTaken> for HttpError {
+    fn from(_: EmailTaken) -> Self {
+        HttpError::public(
+            HttpStatus::CONFLICT,
+            "email_taken",
+            "Email is already registered",
+        )
+    }
+}
+```
+
+The response contains `error.code`, `error.message`, and a server-generated
+`error.request_id` matching `X-Request-Id`. Custom mappings survive generated
+response normalization. Public custom messages and codes are static API text;
+never include user input or secrets. Codes accept lowercase ASCII letters,
+digits, and underscores, up to 64 characters. Invalid codes use default details.
+All 5xx errors use safe default messages even if custom text is supplied. Invalid
+success statuses passed to `HttpError::new` become 500. Log an underlying failure
+explicitly before mapping it; Xecute does not serialize error Display text.
+
+`HttpError` produces a JSON envelope on its own, with an empty request ID when
+there is no request boundary. Generated applications already normalize errors,
+preserve protocol/CORS/retry headers, discard stale representation headers, and
+attach IDs. For a plain Axum router, install
+`xecute::exceptions::exception_boundary(router)` once after assembling routes.
+This helper normalizes error responses; generated servers also have their
+existing panic-catching and deadline middleware. A panic in an independent
+background task is outside the HTTP boundary.
+
+## Keep learning
+
+[API version groups](skills/xecute/references/http/versioning.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# API version groups
+
+Documentation route: /docs/http/versioning
+
+Use explicit version groups when clients need different API contracts at the same time. Each group can have its own routes and API document.
+
+Generated applications register only v1 in
+`src/server/versions.rs`:
+
+| URL | Contract |
+| --- | --- |
+| `/example` | Existing unversioned resource alias |
+| `/v1/example` | Version-one resources, using the same v1 service/container |
+| `/docs/v1/` | Version-one Swagger UI |
+| `/docs/v1/openapi.json` | Version-one contract, with `/v1/...` paths |
+
+`/docs/` and `/docs/openapi.json` continue to describe the unversioned aliases.
+No v2 module, routes, or documentation are generated. Additional version groups
+can be registered explicitly using the runtime API when needed.
+
+```rust
+use xecute::{ApiVersion, ApiVersions};
+
+let versions = ApiVersions::new()
+    .with(ApiVersion::new("v1", v1_router, V1Controller::api_operations())?)?;
+let router = versions.mount(axum::Router::new());
+let documents = versions.documents("My API")?;
+```
+
+Supply controller paths relative to the group; the router and documented paths
+receive the same prefix. Canonical labels are `v1`, `v2`, etc, with positive u32
+version numbers. Invalid labels, duplicate groups, and conflicting contracts fail
+before serving. The same operation ID/schema name may appear in different
+version documents. Global application policies wrap all groups.
+
+```toml
+[api]
+versioning_enabled = true
+
+[docs]
+enabled = true
+```
+
+Set `api.versioning_enabled = false` to keep only unversioned aliases. Set
+`docs.enabled = false` to hide all Swagger/OpenAPI routes while keeping API routes
+active. `GET /` lists each enabled version's Swagger and OpenAPI paths.
+The registration pattern is explicit URL versioning; header-based versioning and
+automatic deprecation/sunset behavior are not implied.
+
+## Keep learning
+
+[Multipart uploads](skills/xecute/references/http/uploads.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Multipart uploads
+
+Documentation route: /docs/http/uploads
+
+Use this guide for multipart file requests. It needs the upload feature and explicit storage configuration; ordinary JSON endpoints do not need it.
+
+A runnable controller example is included at
+[`xecute/examples/file_upload.rs`](https://github.com/morshedulmunna/xecute/blob/main/xecute/examples/file_upload.rs).
+Run from the repository root:
+
+```sh
+cargo run -p xecute --example file_upload --features upload
+curl -F 'file=@report.pdf;type=application/pdf' http://127.0.0.1:3000/uploads
+curl -F 'file=@photo.png;type=image/png' -F 'file=@report.pdf;type=application/pdf' \
+  http://127.0.0.1:3000/uploads
+```
+
+The controller returns HTTP 201 with an array of `key`, `original_name`,
+`content_type`, `size`, and `sha256`. It accepts PNG/JPEG/PDF content, at most four
+files, 1 MiB per file, and 2 MiB total; HTTP framing has an additional 64 KiB
+allowance. MIME signatures must match declared types. Files are private under
+`target/file-upload-example/objects/`, with temporary files in `staging/`.
+`/openapi.json` describes the multipart endpoint; the example has no download route.
+Invalid multipart requests return 400, oversized uploads 413, invalid types 415,
+and missing/empty/excess files 422, with a consistent error envelope and request ID.
+
+This standalone example binds loopback and is separate from generated projects.
+Before deploying it, add authentication and application rate/time limits, use a
+persistent private storage directory, and define cleanup/retention. Content
+signature validation is not malware scanning. Batch rollback is best effort;
+crashes or cancellation can leave objects requiring reconciliation.
+
+
+New projects do not include a built-in uploads module or upload configuration.
+To implement uploads in your own feature module, enable the runtime `upload`
+feature (and `upload-s3` for S3). The runtime provides `UploadPolicy`,
+`UploadService`, `LocalStorage`, `UploadStorage`, and optional `S3Storage`.
+Use `#[multipart]` on the upload handler for multipart OpenAPI metadata.
+
+```toml
+[dependencies]
+xecute = { version = "0.1.8", features = ["upload"] }
+```
+
+Apply HTTP body limits and authentication to your own upload route, keep storage
+outside `public/`, and configure its policy and backend explicitly.
+
+## Keep learning
+
+[Static files](skills/xecute/references/http/static-files.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Static files
+
+Documentation route: /docs/http/static-files
+
+Serve files that are intentionally public. Start with the generated public directory and /static/ prefix, then review path and fallback behavior before changing them.
+
+Newly generated applications include `public/index.html`, served at `/static` and
+`/static/`, plus `public/hello.txt`, served at
+`http://127.0.0.1:3000/static/hello.txt`. Static serving is enabled by default,
+without environment settings. Add files to `public/` and access them at `/static/<filename>`.
+For example, `public/images/logo.png` is served at `/static/images/logo.png`.
+To customize the directory, prefix, or enabled state, edit `StaticConfig` in
+`src/configs/static_files.rs`. Relative directories use the application's working
+directory; the public directory must exist and cannot be the application root or a symlink.
+
+Files support GET, HEAD, MIME types, conditional requests, and byte ranges through
+Tower HTTP `ServeDir`. Directory listings and nested directory indexes are disabled. The mount root
+serves `public/index.html`; other assets use explicit filenames. Hidden path components, parent traversal, and
+symlinked assets are rejected. Keep public directories limited to intended public
+assets; static files share the application's CORS, request IDs, security headers,
+logging, rate limits, and global middleware. HTML retains the restrictive API CSP;
+this is asset serving, not a generated SPA hosting configuration.
+
+The Docker image copies `public/` into the runtime image. For another static directory,
+adapt the Dockerfile or mount the asset directory read-only. Change files in the
+public directory directly or mount updated assets; there is no binary embedding.
+
+## Keep learning
+
+[Choose your next guide](skills/xecute/references/index.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Application configuration
+
+Documentation route: /docs/configuration/application
+
+Start here to change generated server settings. Edit config/AppConfig.toml for application settings and use environment variables for secrets.
+
+Ordinary settings live in the generated `config/AppConfig.toml`. Commit this file;
+keep credentials in `.env` or inject them through your deployment's secret store.
+`.env` is optional and ignored by Git/Docker. Process variables take precedence
+over `.env` for secrets. Ordinary settings have no environment fallback or override.
+
+```toml
+[server]
+bind_address = "127.0.0.1:3000"
+request_timeout_seconds = 30
+shutdown_grace_seconds = 10
+body_limit_bytes = 1048576
+max_in_flight_requests = 256
+
+[rate_limit]
+requests = 60
+window_seconds = 60
+max_clients = 10000
+
+[cors]
+origins = ["https://example.com", "http://localhost:5173"]
+allowed_methods = ["GET", "POST"]
+allowed_headers = ["content-type", "authorization"]
+exposed_headers = ["x-request-id", "retry-after"]
+allow_credentials = false
+max_age_seconds = 600
+
+[docs]
+enabled = true
+
+[logging]
+filter = "info"
+stdout_enabled = true
+file_dir = "logs"
+```
+
+The generated CORS origin list is empty by default. Origins must be exact HTTP(S)
+origins without paths, credentials, wildcards, or trailing slashes. Credentials
+require a nonempty origin list. Arrays are native TOML arrays, without JSON or
+dotenv quoting. Invalid types, unknown keys, invalid protocol values, and numeric
+bounds fail startup before logging/listening. Missing individual values use typed
+defaults, but the file itself must exist. Request limits must be positive; the
+CORS cache duration may be zero.
+
+`Config::from_file()` reads `config/AppConfig.toml` relative to the working directory.
+`Config::from_path(path)` supports an explicit file chosen in bootstrap code.
+The file is parsed once into a validated snapshot shared with logger startup;
+there is no automatic production reload. Development hot reload watches TOML
+files and restarts the process when settings change.
+
+The Dockerfile includes this file and adapts only the generated loopback bind to
+`0.0.0.0:3000`. Custom bind addresses remain unchanged. To supply deployment
+settings, mount a replacement `/app/config/AppConfig.toml` read-only. The default private
+`/app/logs` directory is owned by UID 65532; custom log mounts must also be writable
+by this user. A read-only root filesystem requires writable log storage or an
+empty `logging.file_dir`.
+
+For custom settings, use `xecute::config::ConfigFile` with dotted paths and extend
+the allowed-key schema in `src/configs/server.rs`. Use `Env::process().secret(key)`
+for required credentials and tokens. The template `.env.example` contains only
+commented credential examples, with no active configuration or fake secrets.
+
+## Keep learning
+
+[Typed configuration](skills/xecute/references/configuration/typed.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Typed configuration
+
+Documentation route: /docs/configuration/typed
+
+Use typed configuration when your own feature needs validated settings. Define a Rust type and read it at startup rather than parsing environment values inside every handler.
+
+These APIs are available with CLI 0.1.13, runtime 0.1.8, and macros 0.1.6.
+Update the CLI before generating a new project. Existing applications require
+corresponding dependency and source changes; updating the CLI does not rewrite them.
+
+The common configuration boundary separates `ConfigFile` for ordinary settings
+from `Env` for secrets. Both report value-redacted validation errors. TOML parsing
+preserves native types: `false` is a boolean, while `"false"` is an invalid type
+for a boolean setting. `get_or` defaults only absent keys; supplied bad values
+remain errors. `range` enforces numeric bounds; `required` rejects missing keys.
+Generated configuration rejects unknown keys so typos cannot silently disable policies.
+
+```rust
+use xecute::config::{ConfigError, ConfigFile, Env, SecretString};
+
+struct DatabaseConfig {
+    url: SecretString,
+    pool_size: u64,
+}
+impl DatabaseConfig {
+    fn load(file: &ConfigFile) -> Result<Self, ConfigError> {
+        Ok(Self {
+            url: Env::process().secret("DATABASE_URL")?,
+            pool_size: file.range("database.pool_size", 10, 1, 100)?,
+        })
+    }
+}
+```
+
+Add `database.pool_size` to the generated allowed-key schema when introducing
+this custom setting. Initialize custom configuration before binding the listener.
+`SecretString` redacts Debug output and requires `.expose()` for SDK/client access;
+it does not promise memory zeroization. `.env` and TOML parse errors omit source
+contents. Tests can use `ConfigFile::parse(source)` and map-backed `Env::new`
+without changing process variables. Configuration is a startup snapshot.
+
+## Keep learning
+
+[Logging and exporters](skills/xecute/references/configuration/logging.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Logging and exporters
+
+Documentation route: /docs/configuration/logging
+
+Start with console logs, then configure file rotation or an exporter when you need them. This guide shows which logging behavior belongs to your generated application.
+
+Logging outputs use these settings in `config/AppConfig.toml`:
+
+```toml
+[logging]
+stdout_enabled = true
+file_dir = "logs"
+```
+
+`logging.stdout_enabled` controls JSON console output. A nonempty `logging.file_dir`
+enables JSON file output and creates the private directory. Remove it or leave it
+empty to disable file output. Generated projects include both settings above.
+`logging.filter` continues to filter events across all outputs.
+
+Files use the `app` prefix, daily rotation, and retention of seven matching files.
+These defaults live in `src/configs/logging.rs` and can be changed in code.
+Setting stdout false and omitting the file directory allows an exporter-only
+configuration. An unwritable enabled file destination fails startup.
+
+The file sink uses a dedicated writer thread and an 8192-entry bounded queue.
+A full queue applies backpressure rather than silently dropping events. The
+`LoggerGuard` returned from initialization is retained in `server/bootstrap.rs`
+until normal server shutdown so pending writes are flushed. Forced termination
+cannot guarantee pending log delivery. Built-in request events continue to omit
+payloads, cookies, authorization headers, and query strings.
+
+The default `/logs/` path is ignored by Git and Docker. Configured log storage
+must remain outside the public static directory, even if file output is currently
+disabled. For a read-only container with file output enabled, mount private log
+storage writable by the application's UID 65532. Console logging can instead be
+collected by the deployment's log collector.
+
+## Sentry, Grafana/Loki, OpenTelemetry, and custom exporters
+
+Application modules emit standard `tracing` events, so business code does not need
+to change when a new destination is added:
+
+```rust
+tracing::info!(operation = "create_user", "User created");
+tracing::warn!(operation = "create_user", "Capacity reached");
+```
+
+`src/server/logging.rs` exposes `init_with_layer(&config, exporter_layer)` for a
+`tracing_subscriber::Layer<Registry>`. Replace the default bootstrap initialization
+with this call after configuring your chosen SDK/collector. Standard console
+and file sinks remain independently configurable and continue to receive the
+same events. A test exporter verifies that file logging and an extra layer can
+receive an event together.
+
+For a future Sentry or OpenTelemetry integration, add its SDK dependencies and
+initialize its layer/provider before installing the subscriber. Keep SDK guards
+alive for the server lifetime and shut exporters down according to that SDK's
+requirements. Grafana/Loki deployments can also ingest the existing JSON stdout
+or files through a log collector. No cloud SDK, credentials, or outbound exporter
+is configured by default. Per-backend transport/retries/authentication belong in
+the selected SDK or collector, not in controllers or services.
+
+Static serving, shared environment access, and configurable file/exporter logging
+are available starting with CLI 0.1.11. Existing applications need the corresponding source
+and dependency updates; updating the CLI does not rewrite an existing app.
+
+## Shared configuration readers
+
+`src/configs/environment.rs` re-exports the shared runtime readers.
+`configs::load_env()` loads optional credentials once; `Env::process()` and
+`configs::read_env(key)` read secrets with process-over-dotenv precedence.
+Ordinary settings use `ConfigFile::load("config/AppConfig.toml")` and typed dotted paths.
+Generated server and logger use the same validated configuration snapshot.
+
+```rust
+let token = xecute::config::Env::process().secret("API_TOKEN")?;
+let file = xecute::config::ConfigFile::load("config/AppConfig.toml")?;
+let timeout = file.range("server.request_timeout_seconds", 30, 1, 3600)?;
+```
+
+## Keep learning
+
+[Server defaults](skills/xecute/references/configuration/server-defaults.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Server defaults
+
+Documentation route: /docs/configuration/server-defaults
+
+Understand the policies your generated server already applies, including limits and health endpoints. Review this page before changing middleware or deploying.
+
+Generated applications include the following HTTP policies:
+
+| Policy | Default behavior |
+| --- | --- |
+| Logging | One flat JSON completion log per request, filtered by `logging.filter` |
+| Correlation | UUID `X-Request-Id` response header |
+| Rate limit | 60 requests per socket peer IP per 60-second fixed window |
+| Limiter capacity | At most 10,000 tracked IPs per process |
+| Concurrency | At most 256 active handlers; overload returns `503` |
+| Deadline | 30 seconds until response headers; expiry returns `504` |
+| Body limit | 1 MiB; oversized declared or consumed bodies return `413` |
+| CORS | No allowed cross-origin browser origins by default |
+| Response headers | `nosniff`, frame denial, no-referrer, restrictive API CSP |
+| Errors | Safe JSON envelopes for rejection and failure responses |
+| Shutdown | Ctrl-C/SIGTERM handling with a 10-second drain deadline |
+| Health | Liveness and startup-readiness probes bypass built-in quotas/concurrency limits |
+
+Logs omit payloads, authorization headers, cookies, query strings, and full URLs.
+Matched requests log the route template; unmatched requests may log the requested
+path. Streaming-body completion is not included in latency measurements.
+
+The timeout and concurrency boundary ends when response headers are produced.
+Timeouts cancel the handler future but cannot undo completed writes or stop
+separately spawned tasks. Readiness indicates startup success until you add
+checks for databases and other dependencies.
+
+## Keep learning
+
+[Welcome and startup URLs](skills/xecute/references/configuration/welcome.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Welcome and startup URLs
+
+Documentation route: /docs/configuration/welcome
+
+Use the welcome response and startup output to find your application’s enabled URLs. Only configured routes and documents appear.
+
+`GET /` returns HTTP 200 with the application name, `status: "ok"`, a welcome
+message, and `documentation: "/docs/"`. With `docs.enabled = false` in `config/AppConfig.toml`, the
+`documentation` field is null. Other unregistered paths still return the normal
+404 envelope. The root route is defined in `src/server/router.rs` and can be
+customized there.
+
+Startup emits one `server listening` JSON log with the actual bound address and
+local URL, including when binding port zero. `GET /` exposes the address, URL,
+Swagger and OpenAPI paths, versioned documentation links, and static-file mount.
+Disabled endpoints are null or omitted from the version list. Wildcard bindings
+use loopback URLs and IPv6 addresses are bracketed. Configure public URLs
+separately when running behind a TLS ingress or reverse proxy.
+
+Available starting with CLI 0.1.10. Existing projects need the corresponding
+server changes; updating the CLI does not rewrite them. The runtime crate is unchanged.
+
+## Keep learning
+
+[Choose your next guide](skills/xecute/references/index.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# PostgreSQL
+
+Documentation route: /docs/integrations/postgres
+
+Replace in-memory storage when records must survive a restart. You need a PostgreSQL server, a connection URL, and the postgres feature; follow configuration, provider registration, then repository examples.
+
+Xecute's optional `postgres` feature integrates SQLx 0.9 with dependency injection
+and async application lifecycle. It provides a shared connection pool, validated
+configuration, startup migrations, readiness checks, and graceful pool cleanup.
+Repositories use native SQLx queries and transactions; Xecute does not add an ORM.
+
+Enable the runtime's `postgres` feature:
+
+```toml
+[dependencies]
+xecute = { version = "0.1", features = ["postgres"] }
+```
+
+`postgres` is disabled by default. You do not need SQLx as a separate dependency:
+use `xecute::database::sqlx`. No database URL is needed at compile time because
+this integration uses parameterized runtime queries, not schema-checked macros.
+MVC and CQRS generators still produce in-memory repositories; database adoption
+is explicit and existing generated application files are not rewritten.
+
+## Run the complete example
+
+From the repository root, start a disposable development PostgreSQL instance:
+
+```sh
+docker run --detach --rm --name xecute-postgres-demo \
+  -e POSTGRES_USER=xecute \
+  -e POSTGRES_PASSWORD=xecute_dev_only \
+  -e POSTGRES_DB=xecute_demo \
+  -p 127.0.0.1:55432:5432 postgres:17
+
+docker exec xecute-postgres-demo pg_isready -U xecute -d xecute_demo
+
+# Wait for pg_isready to report "accepting connections", then:
+export DATABASE_URL='postgres://xecute:xecute_dev_only@127.0.0.1:55432/xecute_demo'
+cargo run -p xecute --example postgres --features postgres
+
+# Re-running creates another user; existing records remain in the database.
+# Remove the disposable container and its database after the demo:
+docker stop xecute-postgres-demo
+```
+
+The example applies `examples/postgres/migrations/202610270001_create_users.sql`,
+creates a user and audit entry in one transaction, reads the user back, and closes
+the pool. Its separate `repository.rs` is reusable as a persistence-layer example.
+For durable local development, mount a named Docker volume at PostgreSQL's data
+directory instead of using this disposable setup.
+
+## Configuration and secrets
+
+Read `DATABASE_URL` from the environment or a secret manager. Do not put it into
+ordinary application TOML, source control, log messages, or HTTP error responses.
+Xecute does not automatically load `.env`; generated applications already have an
+environment loader, while standalone examples use the process environment.
+
+```rust
+use std::time::Duration;
+use xecute::database::{PostgresConfig, sqlx::postgres::PgSslMode};
+
+let url = std::env::var("DATABASE_URL")?;
+let config = PostgresConfig::new(&url)?
+    .pool_limits(0, 10)?
+    .acquire_timeout(Duration::from_secs(5))?
+    .ssl_mode(PgSslMode::VerifyFull);
+```
+
+Defaults are zero minimum connections, ten maximum connections, and a five-second
+pool acquisition timeout. Maximum must be positive, minimum cannot exceed maximum,
+and acquisition timeout must be positive. Acquisition includes establishing a
+connection; it is not a SQL statement execution timeout. Configure PostgreSQL
+`statement_timeout` separately when needed. Budget pool sizes across all replicas
+against your database's connection limit.
+
+TLS uses SQLx's PostgreSQL settings. For production, use `VerifyFull` with a
+trusted server certificate and matching hostname; supply an appropriate CA using
+SQLx's connection URL options, such as `sslrootcert`. Local Docker PostgreSQL does
+not offer TLS by default, so the local example uses the driver's default settings.
+SQL statement logging is disabled by this wrapper. `PostgresConfig` debug output
+redacts connection options, and `DatabaseError` exposes only static messages.
+
+## Modules, startup, and shutdown
+
+```rust
+use std::path::Path;
+use xecute::{ModuleDefinition, ModuleGraph};
+use xecute::database::{PostgresConfig, PostgresDatabase, sqlx::migrate::Migrator};
+
+async fn setup() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let config = PostgresConfig::new(&std::env::var("DATABASE_URL")?)?;
+    let migrations = Migrator::new(Path::new("./migrations")).await?;
+    let database_module = ModuleDefinition::new("database")
+        .provider(PostgresDatabase::provider_with_migrations(config, migrations))
+        .export::<PostgresDatabase>();
+
+    // Add your feature's repository/service/handler definitions to this module.
+    let users_module = ModuleDefinition::new("users").import("database");
+    let container = ModuleGraph::new(vec![database_module, users_module]).build()?;
+    container.initialize_async().await?;
+    let work: Result<(), Box<dyn std::error::Error + Send + Sync>> = async {
+        let database = container.resolve::<PostgresDatabase>()?;
+        database.health_check().await?;
+        // Serve traffic, then stop accepting work and drain in-flight requests.
+        Ok(())
+    }.await;
+    let cleanup = container.shutdown_async().await;
+    work?;
+    cleanup?;
+    Ok(())
+}
+```
+
+Register the database once, export it from its owning module, and import that
+module wherever a repository requires it. Repository definitions must declare
+`ProviderKey::of::<PostgresDatabase>()` as a dependency. Dependent factories run
+only after the pool connects and migrations finish. Failed startup prevents
+serving and closes the pool if it was constructed. `PostgresDatabase::provider`
+omits migrations when your deployment runs them separately.
+
+Generated applications currently use synchronous `AppModule::container()`. For
+async resources, build a `ModuleGraph` from `AppModule::definitions()` instead,
+await `initialize_async()`, then pass a retained `Arc<Container>` to
+`AppModule::router_with_container(container.clone())`. That routing helper remains
+usable after async startup. Ensure the exported database module definition and
+importing feature definitions are included in the graph.
+
+Retain the container for cleanup on every exit path after successful startup,
+including router construction, listener binding, serving, and graceful-shutdown
+errors. Capture application work in an async block returning a `Result`, await
+`shutdown_async()` afterward, then return the result; the complete example shows
+this pattern. There are no async cleanup hooks in `Drop`. Release checked-out
+connections and transactions before closing: pool closure waits for them. If
+bounded shutdown is required, apply your application's timeout policy explicitly.
+
+## Migration workflow
+
+Use SQLx migration filenames such as `202610270001_create_users.sql`. Version
+numbers must be unique and ordered. Applied migrations are recorded in
+`_sqlx_migrations`; re-running validates checksums and applies only pending files.
+SQLx's PostgreSQL migration locking serializes concurrent migration runners.
+Do not edit an applied migration: add a new version instead.
+
+The example loads migration files at runtime. Deploy the migration directory and
+resolve its path explicitly, or run migrations as a deployment step before starting
+applications. You can also enable SQLx's `macros` feature in your application to
+embed migrations with `sqlx::migrate!`; follow SQLx's build-script guidance so new
+SQL files trigger recompilation. Xecute does not enable SQLx macros by default.
+
+Run schema-changing migrations with an appropriately privileged deployment role.
+Runtime access can use a separate restricted application role with
+`PostgresDatabase::provider`. There is no automatic schema rollback on application
+shutdown. Migration SQL is trusted application code; backup and rollback strategy
+remain deployment responsibilities.
+
+## Repository and transaction boundaries
+
+Keep the application flow:
+
+```text
+MVC:  Controller → Service → Repository → PostgreSQL
+CQRS: Controller → Command/Query Handler → Repository → PostgreSQL
+```
+
+Bind user input with `$1`, `$2`, and `.bind(value)`. Never interpolate user input
+into a SQL string. Methods on the repository return application entities or DTOs;
+controllers should not contain SQL.
+
+```rust
+use xecute::database::{PostgresDatabase, sqlx};
+
+async fn create_user(db: &PostgresDatabase, name: &str) -> Result<i64, sqlx::Error> {
+    let mut tx = db.begin().await?;
+    let id = sqlx::query_scalar::<_, i64>(
+        "INSERT INTO xecute_example_users (name) VALUES ($1) RETURNING id",
+    ).bind(name).fetch_one(&mut *tx).await?;
+
+    sqlx::query(
+        "INSERT INTO xecute_example_audit (user_id, action) VALUES ($1, $2)",
+    ).bind(id).bind("created").execute(&mut *tx).await?;
+
+    tx.commit().await?;
+    Ok(id)
+}
+```
+
+All participating writes must execute against `&mut *tx`, not `db.pool()`, or they
+will not share the transaction. Call `commit()` on success or `rollback()` when
+handling an error explicitly. Dropping an uncommitted SQLx transaction schedules
+rollback. Avoid holding a transaction across unrelated network calls.
+
+For a use case spanning multiple repositories, the handler/service should own the
+transaction and pass `&mut PgConnection` (obtained via `&mut *tx`) to each repository
+method. Starting a new transaction inside every repository cannot make multiple
+repositories' writes atomic. Automatic transaction propagation, distributed
+transactions, and automatic retries are not provided.
+
+## Readiness and error handling
+
+Use `health_check().await` in a readiness endpoint and return HTTP 503 when the
+database is unavailable. Keep liveness independent of PostgreSQL connectivity.
+The generated readiness route is not changed automatically.
+
+`DatabaseError` redacts configuration, connection, migration, and readiness errors.
+Lifecycle registration maps setup failures to static `InjectError` messages.
+`begin()` and native SQLx repository queries retain SQLx errors for application
+handling, including SQLSTATE codes for unique/foreign-key violations. Map these
+to domain errors and safe HTTP responses; never serialize raw driver errors.
+
+## Tests and CI
+
+Normal feature-enabled tests include configuration validation, redaction, and a
+bounded connection-attempt test that requires no database:
+
+```sh
+cargo test -p xecute --features postgres,testing --test postgres
+```
+
+Live integration tests are explicitly ignored in the default suite. They fail
+with a clear message if explicitly invoked without `TEST_DATABASE_URL`; they do
+not silently pass when no database is available.
+
+```sh
+# Use the disposable instance from the example setup; its role can CREATE DATABASE.
+export TEST_DATABASE_URL="$DATABASE_URL"
+cargo test -p xecute --features postgres,testing --test postgres -- --ignored
+```
+
+Each live test creates its own database with a generated name, closes its pools,
+and drops only that database. The configured role requires `CREATEDB`; use a
+dedicated local/CI instance. The supplied database is used only for provisioning.
+If a test panics, discard the disposable PostgreSQL instance afterward.
+
+Coverage includes persistent repository writes, parameter binding, audit atomicity,
+commit, explicit and dropped rollback, migration ordering, idempotency, checksum
+mismatch, concurrent migration locking, failed-startup cleanup, acquisition limits,
+readiness, closed-pool behavior, module DI, and HTTP injection. The repository's
+`postgres` CI job runs the live suite against a PostgreSQL service.
+
+SQLx reference: [pool options](https://docs.rs/sqlx/latest/sqlx/pool/struct.PoolOptions.html),
+[migrations](https://docs.rs/sqlx/latest/sqlx/migrate/struct.Migrator.html),
+[transactions](https://docs.rs/sqlx/latest/sqlx/struct.Transaction.html), and
+[parameter binding](https://docs.rs/sqlx/latest/sqlx/fn.query.html).
+
+## Keep learning
+
+[Guards and JWT authentication](skills/xecute/references/integrations/auth.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Guards and JWT authentication
+
+Documentation route: /docs/integrations/auth
+
+Protect selected routes using verified identities. Configure a trusted token verifier before adding role or permission checks; reading an Authorization header is not authentication.
+
+Xecute supports executable guards at application, module, controller, and HTTP-method
+scope. Guards run before request DTO extraction and handler execution. Optional
+JWT authentication installs a verified principal; role and permission policies
+then authorize that principal.
+
+Enable the runtime's `auth` feature in your application:
+
+```toml
+[dependencies]
+xecute = { version = "0.1", features = ["auth"] }
+```
+
+Custom guards require no feature flag. JWT verification, `AuthenticatedUser`,
+`#[roles]`, and `#[permissions]` require `auth`. Existing MVC/CQRS resources remain
+public until you attach guards. Generators do not create a login or user table.
+
+## Choose the scope: module, controller, or route
+
+Use `#[guard(...)]` with async guard functions. A guard receives a request and
+returns `Result<Request, E>`, where `E` implements `IntoResponse`. Returning an
+error stops the request before DTO validation and handler execution.
+
+This custom guard checks a header; JWT verification is shown later in this guide:
+
+```rust
+use xecute::{HttpError, HttpStatus, middleware::Request};
+
+async fn require_api_key(request: Request) -> Result<Request, HttpError> {
+    // Example policy only: load real credentials from validated configuration.
+    if request.headers().get("x-api-key").is_none() {
+        return Err(HttpError::new(HttpStatus::UNAUTHORIZED));
+    }
+    Ok(request)
+}
+```
+
+The example only checks presence. Do not use header presence as credential
+verification; verify the value against your configured policy or use the JWT guard.
+
+### Guard every controller in a module
+
+In a generated MVC user module, add the annotation **below** `#[module(...)]`:
+
+```rust
+use xecute::{module, guard};
+#[module(
+    providers = [UserRepository, UserService, UserController],
+    controllers = [UserController],
+    exports = [UserService],
+)]
+#[guard(require_api_key)]
+pub struct UserModule;
+```
+
+This is a module fragment: keep the generated imports for your providers and
+import the guard function from its owning module. An equivalent declaration is
+`#[module(..., guards = [require_api_key])]`; use either style. Multiple guards
+run in list order. If both forms are used, `guards = [...]` runs first, followed
+by the `#[guard]`, `#[roles]`, and `#[permissions]` annotations in source order.
+
+Newly generated resources mount through `UserModule::scoped_router(...)`, so the
+module policy covers every controller in its `controllers` list. Imported modules
+are mounted separately; an import controls DI visibility, not HTTP ownership.
+
+For manual routing, merge the **module** router instead of individual controllers:
+
+```rust
+let router = axum::Router::new()
+    .merge(UserModule::scoped_router(container.clone()));
+```
+
+The `container` is an `Arc<Container>` built from all required module definitions.
+Request-scoped DI context is installed before module guards, so a guard can resolve
+providers through `RequestScope`. Controller types must still be registered as
+providers; the `controllers` list does not replace provider registration.
+
+### Guard one controller
+
+```rust
+use xecute::prelude::*;
+#[controller("/user")]
+#[guard(require_api_key)]
+#[derive(Injectable)]
+pub struct UserController {}
+```
+
+This fragment protects every route in the controller. Use it when other
+controllers in the same module should have different policies.
+
+### Guard one route
+
+Inside the controller’s `#[routes]` implementation:
+
+```rust
+#[get("/private")]
+#[guard(require_api_key)]
+async fn private(&self) -> &'static str {
+    "Allowed"
+}
+```
+
+A route guard protects that HTTP method only. Other methods on the same path
+keep their own policies. Module/controller guards still apply to every matched
+path in their scope, including method-not-allowed requests. Unmatched paths and
+separately merged public modules do not inherit another module’s policy.
+
+### Combine scopes and JWT policies
+
+```text
+Application middleware → Application guards → Module guards
+→ Controller middleware → Controller guards
+→ Route middleware → Route guards → DTO extraction → Handler
+```
+
+Policies are additive. A route cannot bypass a guard on its controller or module.
+Keep login/public routes in a separately mounted public module when necessary.
+Module `#[roles(...)]` and `#[permissions(...)]` are supported with the `auth`
+feature, just like controller and route policies. Authentication must run before
+those checks, for example `#[guard(xecute::auth::authenticate_injected)]` followed
+by `#[roles("admin")]` on the module. Configure the verifier provider first.
+
+To guard every generated application route, place `#[guard(...)]` beneath the
+root `AppModule`’s `#[module(...)]`. Its generated router applies the root guards
+after assembling all resource modules, with DI context outside the guard layer.
+
+### Existing applications
+
+Updating the CLI does not rewrite previously generated routing code. Replace
+`UserController::scoped_router(container.clone())` merges with
+`UserModule::scoped_router(container.clone())` for each feature. In the root
+`router_with_container` helper, after all feature merges, return:
+
+```rust
+Ok(xecute::with_container(AppModule::apply_guards(router), container))
+```
+
+Apply each module wrapper once, before merging unrelated routes. Calling a
+controller router directly does not discover or apply its module’s guards.
+
+## Run the example
+
+From the repository root, generate a development secret and start the server:
+
+```sh
+export JWT_SECRET="$(openssl rand -hex 32)"
+cargo run -p xecute --example auth --features auth
+```
+
+In another terminal, export the **same** development secret, then:
+
+```sh
+# The token subcommand is a local demo issuer, not a login endpoint.
+ADMIN_TOKEN=$(cargo run --quiet -p xecute --example auth --features auth -- token admin)
+READER_TOKEN=$(cargo run --quiet -p xecute --example auth --features auth -- token reader)
+
+curl -i http://127.0.0.1:3000/health
+# 200: public route
+curl -i http://127.0.0.1:3000/users/me
+# 401 + WWW-Authenticate: Bearer
+curl -i http://127.0.0.1:3000/users/me -H "Authorization: Bearer $READER_TOKEN"
+# 200: verified subject and roles
+curl -i http://127.0.0.1:3000/users/admin -H "Authorization: Bearer $READER_TOKEN"
+# 403: authenticated, missing admin role
+curl -i http://127.0.0.1:3000/users/admin -H "Authorization: Bearer $ADMIN_TOKEN"
+# 200: admin role and users:read permission
+```
+
+Tokens issued by the example expire after ten minutes. Never use the demo issuer
+as production authentication: real issuance must authenticate credentials first.
+The server binds only to localhost; use HTTPS at your production ingress.
+
+## Configure a trusted verifier
+
+```rust
+use std::sync::Arc;
+use axum::Extension;
+use xecute::auth::JwtVerifier;
+
+let secret = std::env::var("JWT_SECRET")?;
+let verifier = Arc::new(JwtVerifier::hs256(
+    secret.as_bytes(), "https://issuer.example", "users-api",
+)?);
+// Apply to the final router so authentication guards can read the verifier:
+let router = router.layer(Extension(verifier));
+```
+
+HS256 requires at least 32 bytes of secret material; length alone does not imply
+entropy, so generate it cryptographically and store it in a secret manager.
+Shared-secret verifiers also possess signing capability. For externally issued
+credentials, pin a trusted RS256 public key instead:
+
+```rust
+let verifier = JwtVerifier::rs256(
+    &std::fs::read("./keys/access-token-public.pem")?,
+    "https://issuer.example", "users-api",
+)?;
+```
+
+Use an appropriately sized RSA key (at least 2048 bits). Key material is loaded
+from trusted application configuration. The verifier does not fetch URLs or trust
+`jku`, `jwk`, `x5u`, or token-supplied key material. `kid` does not select another
+key; this API pins one key. JWKS fetching and automatic key rotation are not
+included. Rotate configuration explicitly and plan overlapping validity through
+your identity provider and application deployment.
+
+Both constructors require nonblank issuer and audience. Verification pins the
+algorithm and checks signature, expiration, issuer, and audience. `exp`, `iss`,
+`aud`, and a nonblank string `sub` are required. An audience can be a string or a
+list containing the configured audience. Optional `nbf` is checked. Clock leeway
+is zero; keep issuer and server clocks synchronized. Unknown critical JOSE
+extensions and tokens longer than 16 KiB are rejected. `iat`, token revocation,
+and OAuth token-type semantics are not additional policies in this wrapper.
+Use a dedicated API audience so tokens intended for another application are not
+accepted here.
+
+The supported authorization claim shape is:
+
+```json
+{
+  "sub": "user-42",
+  "iss": "https://issuer.example",
+  "aud": "users-api",
+  "exp": 2000000000,
+  "roles": ["member", "admin"],
+  "permissions": ["users:read", "users:write"]
+}
+```
+
+`roles` and `permissions` are optional arrays of strings and default to empty.
+Malformed claim types are rejected. Custom identity-provider claims, nested roles,
+and OAuth's space-delimited `scope` are not automatically mapped. Use trusted
+issuer configuration or an application-specific authentication guard to adapt
+those formats; never create authorization data from unsigned request input.
+
+## Protect controllers and routes
+
+```rust
+use xecute::prelude::*;
+use xecute::auth::{self, AuthenticatedUser};
+
+#[controller("/users")]
+#[guard(auth::authenticate)]
+#[roles("member")]
+#[derive(Injectable)]
+pub struct UserController {}
+
+#[routes]
+impl UserController {
+    #[get("/me")]
+    async fn me(&self, user: AuthenticatedUser) -> String {
+        user.0.subject().to_owned()
+    }
+
+    #[post("")]
+    #[roles("admin")]
+    #[permissions("users:write")]
+    async fn create(&self) -> &'static str {
+        "Authorized"
+    }
+}
+```
+
+Place controller annotations **below** `#[controller]` on the struct. You can
+alternatively put controller policies below `#[routes]` on the impl. Route
+annotations belong inside the owning `#[routes]` impl on HTTP handlers. Using
+these annotations outside their owning macro is a compile error. Legacy
+`#[controller("...")] impl ...` syntax is supported as well.
+
+All listed roles and all listed permissions are required, with exact,
+case-sensitive matching. There is no implicit admin bypass, wildcard expansion,
+or OR policy. Module, controller and route policies are additive: a route cannot weaken
+its enclosing scopes' requirements. Empty policies are compile errors (and direct
+runtime helper calls deny empty lists). For OR policies or record ownership,
+write a custom guard or domain authorization service.
+
+Authentication must execute before role/permission guards. Keep
+`#[guard(auth::authenticate)]` above policies in the same scope. `AuthenticatedUser`
+only reads an already verified principal; it does not silently parse credentials.
+The principal exposes subject, roles, permissions, expiry, `has_role`, and
+`has_permission`. Its fields are private and it cannot be deserialized from user
+input. Authorization of a specific record still belongs in your application after
+loading that record: a users:read permission alone does not establish ownership.
+Reuse those checks for HTTP, command handlers, and background jobs.
+
+## Application guards and public routes
+
+```rust
+let router = xecute::Application::new(router)
+    .use_guard(xecute::auth::authenticate)
+    .into_router()
+    .layer(axum::Extension(verifier));
+```
+
+Application guards protect the entire supplied router, including fallback
+responses. To keep health, login, or public endpoints unauthenticated, prefer
+guarding only protected controllers or merge a guarded private router with a
+separate public router afterward. There is no `#[public]` annotation that bypasses
+an already-running application/controller guard. Avoid broad URI-prefix bypasses
+inside authentication code.
+
+Controller guards preserve unrelated 404 routes. A method-level guard does not
+protect another HTTP method on the same path and does not replace that method's
+405 response. Policy changes do not silently add guards to newly generated
+controllers: explicitly protect each private controller, or use a global guard.
+
+## Custom guards and dependency injection
+
+A guard is an async function taking the request and returning it on success:
+
+```rust
+use xecute::{HttpError, HttpStatus, middleware::Request};
+
+async fn require_feature(request: Request) -> Result<Request, HttpError> {
+    let enabled = request.extensions().get::<bool>().copied().unwrap_or(false);
+    if !enabled { return Err(HttpError::new(HttpStatus::FORBIDDEN)); }
+    Ok(request)
+}
+```
+
+Attach it with `#[guard(require_feature)]` or
+`Application::use_guard(require_feature)`. Multiple guards execute in declaration
+order; the first rejection prevents subsequent guards, DTO decoding/validation,
+and handler execution. A guard can enrich request extensions but must leave the
+body untouched. Return safe error types; custom guard responses are application
+code, so Xecute cannot redact arbitrary text you put into them.
+
+For DI-managed authentication, register `JwtVerifier` as a provider value and use
+`#[guard(auth::authenticate_injected)]` on a controller built with `scoped_router`.
+The guard resolves the verifier through the active `RequestScope`; missing
+configuration or failed DI resolves to a safe 500. Export/import the provider's
+owning module when sharing it across modules.
+
+Custom guards can resolve services via
+`request.extensions().get::<xecute::RequestScope>()` and `scope.resolve::<T>()`.
+Module/controller/route guards created by `scoped_router` already have a request scope.
+For a global DI guard, install `xecute::with_container(router, container)` **outside**
+the assembled Application router, so the scope exists before the guard executes.
+With direct `Controller::router`, use the Extension-backed verifier or install
+`with_container` explicitly. Existing async lifecycle providers must complete
+`initialize_async()` before traffic reaches any guard.
+
+## Execution order
+
+Xecute uses nested router scopes. At each scope, middleware runs before guards:
+
+```text
+Application middleware → application guards
+  → root module guards → feature module guards
+    → controller middleware → controller guards
+      → route middleware → route guards
+        → request extraction/DTO validation → handler
+```
+
+Middleware registration and guard registration are each ordered independently;
+calling `use_guard` before `use_middleware` still runs application middleware
+first. A controller can attach middleware/policies to both its struct and impl;
+then struct scope wraps impl scope, which wraps route scope. This is Xecute's
+explicit nesting order; it does not promise NestJS's separate, universal
+all-middleware-then-all-guards lifecycle. Install CORS/preflight handling outside
+authentication when browsers need unauthenticated OPTIONS handling.
+
+## Errors, OpenAPI, and boundaries
+
+- Missing/malformed/duplicate Authorization headers, invalid tokens, and missing
+  principals return 401 with `WWW-Authenticate: Bearer`.
+- A valid principal lacking a role/permission returns 403.
+- An absent configured verifier returns a safe 500; it never grants access.
+
+Bearer scheme matching is case-insensitive; this implementation requires exactly
+one Authorization header and one non-whitespace token. It accepts no query-string
+or cookie token fallback. Error bodies use Xecute's safe JSON envelope; wrap your
+router with `exceptions::exception_boundary` for request IDs and normalization.
+Neither token values, JWT verification reasons, nor key material appear in these
+errors. Do not log Authorization headers or bearer tokens in custom middleware.
+
+Guard annotations do not yet add bearer security schemes to generated OpenAPI.
+When preparing Swagger documents, add a `components.securitySchemes.bearerAuth`
+entry with `type: http`, `scheme: bearer`, and `bearerFormat: JWT`, then add
+`security: [{"bearerAuth": []}]` only to protected operations. Document 401/403
+responses with existing `#[resp]` annotations. Public operations should remain
+explicitly public in the document.
+
+This feature verifies bearer access tokens and applies application policies.
+Password registration/login, password hashing, refresh tokens, sessions/cookies,
+CSRF protection, logout/revocation, OAuth/OIDC discovery, and tenant/record-level
+policies remain separate application/identity-provider responsibilities. Role
+changes are reflected when the issuer issues new claims or your application
+checks a current policy store; previously issued tokens remain valid until expiry
+unless you implement revocation. No authentication storage is auto-generated.
+
+## Tests
+
+```sh
+# Core custom guards, without JWT dependencies:
+cargo test -p xecute --no-default-features --test guards_http
+
+# Real signature verification, HTTP policy/extractor tests, and runnable demo tests:
+cargo test -p xecute --features auth --test auth_http --test guards_http --example auth
+
+# Reject invalid macro policy declarations:
+cargo test -p xmacros
+```
+
+Tests cover HS256/RS256, wrong keys and algorithms, algorithm confusion,
+unsigned/malformed/expired/not-yet-valid tokens, required issuer/audience/subject,
+malformed role/permission claims, header ambiguity, safe errors and correlation,
+public endpoints, additive policies, body validation ordering, scoped DI, global
+and legacy guard execution, and preservation of unrelated methods/paths. PEM
+files under `tests/fixtures/auth` are generated **test-only** keys.
+
+Implementation references: [jsonwebtoken verification/validation](https://docs.rs/jsonwebtoken/latest/jsonwebtoken/struct.Validation.html)
+and [jsonwebtoken key and crypto backend documentation](https://github.com/Keats/jsonwebtoken).
+
+## Keep learning
+
+[Jobs and scheduling](skills/xecute/references/integrations/jobs.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Jobs and scheduling
+
+Documentation route: /docs/integrations/jobs
+
+Move suitable work out of a request handler into bounded workers. These jobs run in the current process and are not durable across restart; choose that model before configuring retries.
+
+Enable Xecute's `jobs` feature for bounded, process-local Tokio workers with
+receipts, retries, per-attempt deadlines, graceful draining, and interval schedules.
+
+```toml
+[dependencies]
+xecute = { version = "0.1", features = ["jobs"] }
+```
+
+This feature does not require a broker or database. **Accepted jobs are not persisted:** a process crash/restart loses
+queued and running work. Use a durable broker or a database outbox/worker system
+for work that must survive a crash. This implementation is suitable for bounded
+best-effort application work; it does not claim exactly-once delivery, distributed
+leases, dead-letter storage, or multi-process queue coordination.
+
+## Create a queue and observe completion
+
+```rust
+use std::time::Duration;
+use xecute::jobs::{JobContext, JobError, JobQueue, QueueConfig};
+
+struct SendEmail { user_id: u64 }
+
+let config = QueueConfig::new(128, 4)?
+    .retry(3, Duration::from_millis(250))?
+    .attempt_timeout(Duration::from_secs(10))?;
+
+let queue = JobQueue::new(config, |job: JobContext<SendEmail>| async move {
+    // Pass job.id to your delivery API as an idempotency key when supported.
+    // Call an async email client using job.payload.user_id here.
+    let _ = (job.id, job.attempt, job.payload.user_id);
+    Ok::<(), JobError>(())
+})?;
+
+let receipt = queue.enqueue(SendEmail { user_id: 42 }).await?;
+let job_id = receipt.id();
+let outcome = receipt.wait().await?;
+assert_eq!(outcome.id, job_id);
+assert!(outcome.result.is_ok());
+queue.shutdown().await?;
+```
+
+`JobQueue::new` must run inside an active Tokio runtime with its time driver
+enabled. `JobQueue::provider` defers startup until the container's async startup
+and attaches a queue-draining shutdown hook. Queue clones share workers, buffer,
+shutdown state, and counters; they do not create additional worker pools.
+
+`JobContext<T>` contains an `Arc<T>` payload, stable UUID, and one-based attempt
+number. Payloads need `Send + Sync + 'static`, but do not need `Clone`. A receipt
+waits for this particular accepted job; dropping its receipt does not cancel the
+job. No unbounded in-memory job history is retained, and an ID alone cannot be
+used to look up an old result. Retain/observe receipts or record application job
+state when clients need later status checks.
+
+## Backpressure, limits, and retries
+
+`QueueConfig::new(capacity, workers)` requires positive capacity and 1..=1024
+workers. Capacity is the maximum **waiting** job count; up to `workers` additional
+jobs can be running. Payload size is application-controlled; choose appropriate
+payload bounds as well as a buffer count. Retry delay occupies a worker slot,
+preventing a failing dependency from creating an unbounded retry backlog.
+
+- `enqueue(payload).await` waits for capacity; cancellation before it returns
+  means the payload was not accepted.
+- `try_enqueue(payload)` returns `QueueError::Full` immediately when capacity is
+  exhausted, and `Closed` after shutdown starts.
+- A failed submission consumes its payload; retain a clone/application record
+  yourself if you intend to submit again.
+
+Defaults are three total attempts, 100ms fixed delay, and a 30-second deadline per
+attempt. `.retry(max_attempts, delay)` supports 1..=100 total attempts; zero delay
+is valid. `.attempt_timeout(duration)` requires a positive, representable duration.
+
+Handlers return:
+
+```rust
+Err(JobError::Retryable("temporary_delivery_error"))
+// or
+Err(JobError::Permanent("recipient_invalid"))
+```
+
+Only `Retryable` errors and timeouts are retried, up to the configured attempt
+count. Permanent errors stop immediately. Handler panics become a terminal
+`JobFailure::Panicked`; they do not kill the queue's other workers or cause an
+automatic retry. Rust's ordinary panic hook still controls panic logging, so do
+not panic with secrets or request payloads. Use static, safe diagnostic codes in
+`JobError` values.
+
+`JobOutcome` reports `attempts` and `result`, with permanent, retry-exhausted,
+timed-out, and panicked terminal states. A receipt returns `WorkerStopped` if its
+worker is aborted before delivering an outcome. `stats()` exposes submitted,
+succeeded, failed, and retried counters as process-local approximate snapshots.
+Terminal failures are not automatically stored or published; observe outcomes
+and emit application logs/metrics deliberately.
+
+On timeout, the attempt task is aborted and joined before retrying. Cancelling a
+Rust future does not undo a remote operation that already committed. Use the same
+`job.id` across retries as an idempotency key, and apply application/database
+uniqueness guarantees where required. CPU-heavy or blocking code prevents prompt
+cooperative cancellation; workers are for nonblocking async handlers. `spawn_blocking`
+work and external side effects require their own cancellation/lifetime policy.
+
+## Dependency injection and resource ordering
+
+For a handler without DI dependencies:
+
+```rust
+let definition = JobQueue::provider(config, |job: JobContext<SendEmail>| async move {
+    let _ = job.payload.user_id;
+    Ok::<(), JobError>(())
+});
+let container = xecute::Container::builder().provider(definition).build()?;
+container.initialize_async().await?;
+let queue = container.resolve::<JobQueue<SendEmail>>()?;
+// Submit work.
+container.shutdown_async().await?;
+```
+
+When handlers depend on a database, cache, or client, use your own
+`ProviderDefinition::singleton_async::<JobQueue<YourJob>, _, _>` factory. Declare
+all `ProviderKey` dependencies, resolve them from its supplied container, and
+capture their Arcs in the handler. Attach
+`.on_shutdown::<JobQueue<YourJob>, _, _>(...)` to await `queue.shutdown()`.
+This dependency graph makes queues drain **before** databases/caches close.
+Do not resolve the queue back into its own handler: that creates an ownership
+cycle and can prevent final-drop cancellation.
+
+The runnable [jobs/cache example](https://github.com/morshedulmunna/xecute/blob/main/xecute/examples/jobs_cache/main.rs) implements this
+pattern with `Cache` as an explicit queue dependency, a retryable job, and cleanup
+even when application work fails:
+
+```sh
+cargo run -p xecute --example jobs_cache --features jobs,cache
+```
+
+Controllers can inject `Arc<JobQueue<YourJob>>` or extract it with `Inject<T>` in a
+scoped router. Prefer small payloads containing stable record IDs. Do not copy
+Authorization headers, request scopes, or borrowed HTTP request data into jobs.
+Background jobs have application-owned lifetime, not HTTP request lifetime.
+Authorize the request before enqueueing, and perform any current record-level
+policy checks your job requires when it executes.
+
+Each payload type identifies one concrete DI provider. Use distinct payload/newtype
+wrappers for independent queues. Module imports/exports and test overrides follow
+the existing container rules. With the `testing` feature, queues work with
+`TestingModule::compile_async()`.
+
+## Graceful shutdown and cancellation
+
+`shutdown().await` stops submissions, rejects blocked producers, drains already
+accepted jobs including retries, and joins all workers. Calls are safe concurrently
+or repeatedly. `is_closed()` reports whether submissions have stopped. Never call
+shutdown from one of the same queue's handlers: shutdown waits for that handler.
+
+Stop HTTP submission sources and interval schedules first, then drain requests
+and queues, then close their dependencies. Estimate a drain deadline from queue
+capacity, worker count, attempt limits, retry delays, and actual handler behavior.
+There is no implicit queue-wide shutdown timeout.
+
+If a caller cancels `queue.shutdown()`, join handles remain owned by the queue;
+calling it again resumes draining. Dropping all queue handles aborts its workers
+and their currently executing attempt tasks. That is cancellation, not graceful
+completion. If you put an external timeout around `Container::shutdown_async`,
+remember the lifecycle system does not retry a cancelled cleanup hook: retain a
+queue handle if you need to resume its drain explicitly.
+
+## Interval schedules
+
+```rust
+let mut schedule = queue.schedule_every(Duration::from_secs(60), || {
+    SendEmail { user_id: 42 }
+})?;
+// Keep the handle alive while the schedule is wanted.
+let skipped = schedule.skipped();
+schedule.stop().await?;
+queue.shutdown().await?;
+```
+
+The first occurrence is after one full interval, not immediately. Missed ticks use
+Tokio's `Skip` policy. A full queue skips that occurrence and increments
+`skipped()` rather than accumulating jobs. A closed queue stops the schedule.
+Schedule creation does not wait for individual job results; observe queue failure
+counters and instrument the handler. The payload factory must be short and
+nonblocking. `is_finished()` reveals an exited scheduling task, and `stop()`
+reports an unexpected task/factory panic as `WorkerStopped`. Stop is idempotent;
+dropping the handle aborts future ticks but does not cancel already accepted jobs.
+
+Schedules are per-process: four replicas run four schedules. Distributed singleton
+cron, persisted schedules, cron expressions, time zones, and leader election are
+not included. To lifecycle-manage a schedule, put its handle behind a Tokio mutex
+in its own singleton provider, declare the queue as its dependency, and stop the
+handle in its shutdown hook. This orders schedule stop before queue draining.
+
+## Tests
+
+```sh
+cargo test -p xecute --features jobs,cache,testing --test jobs --test cache --example jobs_cache
+```
+
+Queue tests cover retry identity/delay, permanent and exhausted failures, timeout
+cancellation, panic isolation, bounded concurrency/capacity, cancelled submissions,
+dropped receipts, shutdown draining/cancellation/resumption, final-drop task
+ownership, scheduling timing/full-queue behavior, schedule factory failures, and
+DI cleanup order. Time-dependent unit tests use Tokio's paused clock.
+
+Reference: [Tokio task ownership and cancellation](https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html)
+and [interval missed-tick behavior](https://docs.rs/tokio/latest/tokio/time/enum.MissedTickBehavior.html).
+
+## Keep learning
+
+[Memory and Redis caching](skills/xecute/references/integrations/cache.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Memory and Redis caching
+
+Documentation route: /docs/integrations/cache
+
+Cache data that can be recomputed, with an explicit key and expiration. Start with memory caching; use Redis only when you need that backend and have a Redis service available.
+
+Xecute exposes an explicit `Cache` API for JSON values or bytes, positive TTLs,
+exact-key invalidation, and lifecycle cleanup. Choose bounded process-local memory
+or an optional namespaced Redis backend. Caching is opt-in; no controller response
+or authenticated data is cached automatically.
+
+Enable the feature in your application's Cargo.toml:
+
+```toml
+[dependencies]
+xecute = { version = "0.1", features = ["cache"] }
+# Use features = ["cache-redis"] for Redis; this also enables cache.
+```
+
+## Memory cache
+
+```rust
+use std::time::Duration;
+use xecute::cache::Cache;
+
+let cache = Cache::memory(1000, 1_048_576)?;
+cache.set("catalog:v1:product:42", &serde_json::json!({"name":"Keyboard"}),
+    Duration::from_secs(60)).await?;
+let product = cache.get::<serde_json::Value>("catalog:v1:product:42").await?;
+cache.delete("catalog:v1:product:42").await?;
+cache.close().await?;
+```
+
+The first limit is entry count; the second is maximum **serialized bytes per
+value**. Both must be positive. Keys must be nonempty and at most 512 bytes.
+Capacity bounds stored entries, while application limits bound the working input
+and serialization allocation. Memory overhead includes keys and bookkeeping in
+addition to value bytes. This small cache uses a mutex and linear LRU bookkeeping;
+use Redis or a specialized application cache when workloads require larger/highly
+contended local caches.
+
+Expired entries are removed lazily on reads/writes/deletes. When capacity is full,
+a new key evicts the least recently read/written live entry. An overwrite replaces
+both value and expiration; reads refresh LRU position **without** extending TTL.
+Clones share entries. Separate application processes do not share memory entries,
+and all entries disappear on restart or explicit memory-cache closure.
+
+## API semantics
+
+- `set(key, &value, ttl)` JSON-serializes a value. `get::<T>(key)` returns
+  `Option<T>`; misses and expired entries return `None`.
+- `set_bytes` / `get_bytes` support raw byte data.
+- `delete(key)` invalidates only that key and returns whether a live entry existed.
+- `close()` is shared and idempotent. Future operations return `Closed`; memory
+  entries are cleared, while Redis entries retain their normal server TTL.
+
+Every set requires a positive TTL. Zero, overflowing, or unrepresentable durations
+return `InvalidTtl`; persistent entries are not created accidentally. Redis TTLs
+are rounded **up** to whole milliseconds; memory uses the monotonic Tokio clock.
+Backend writes apply value and TTL atomically within that backend. A rejected
+oversized value or invalid TTL does not replace an old entry.
+
+JSON decoding/type mismatches return `Serialization`, not `None`. Keep key schemas
+versioned when changing serialized types. Use an `Option` field or a tagged value
+when your domain needs to distinguish a cached null/negative result from a miss.
+Errors are static and redacted. Redis failures return `Unavailable`, distinct from
+a cache miss. Decide whether your application should recompute, fail, or use a
+separate fallback policy; do not silently hide every storage/serialization error.
+
+## Redis configuration
+
+Use a dedicated local instance to try the Redis backend:
+
+```sh
+docker run --detach --rm --name xecute-redis-demo \
+  -p 127.0.0.1:56379:6379 redis:8
+export TEST_REDIS_URL='redis://127.0.0.1:56379/'
+cargo test -p xecute --features cache-redis --test cache_redis -- --include-ignored
+docker stop xecute-redis-demo
+```
+
+Configure application Redis separately from test credentials:
+
+```rust
+use std::time::Duration;
+use xecute::cache::{Cache, RedisCacheConfig};
+
+let config = RedisCacheConfig::new(
+    &std::env::var("REDIS_URL")?, "users-api-v1",
+)?
+.max_value_bytes(1_048_576)?
+.timeout(Duration::from_secs(2))?;
+let cache = Cache::redis(config).await?;
+cache.set("tenant:7:user:42", &42, Duration::from_secs(60)).await?;
+let value = cache.get::<u64>("tenant:7:user:42").await?;
+cache.close().await?;
+```
+
+URLs may use `redis://` or TLS `rediss://`. Store credentials in environment/secret
+management; debug output redacts connection options and runtime errors exclude
+URLs and driver messages. For networked production Redis, configure authenticated
+ACLs and verified TLS; do not disable certificate verification via URL options.
+
+The namespace is 1..=128 ASCII letters, digits, dots, underscores or hyphens.
+Physical keys are `namespace:key`; clients using the same Redis database and
+namespace share entries, while different namespaces remain separate. Namespace
+isolation is a naming convention, not an authorization boundary: scope Redis ACLs
+and infrastructure access appropriately. Xecute never calls FLUSHDB, FLUSHALL, or
+wildcard deletion. Individual deletes affect only the selected namespaced key.
+
+The stable Redis client provides multiplexing/reconnection. Initial connection
+and each complete operation, including waiting on reconnection, have a configured
+positive timeout (default two seconds). A timed-out network command may already
+have reached Redis; it is not a transactional undo guarantee. Reconnection is not
+a durable write queue. Values written by another application may still allocate
+memory while being received before this wrapper can reject an oversized value;
+use a cache-owned namespace and server-side memory limits as well.
+
+Redis capacity/eviction is controlled by the server (`maxmemory` and its eviction
+policy), not the memory-cache entry limit. Redis persistence, clustering,
+replication/failover and availability are operational choices outside this
+wrapper. Closing a handle drops its connection manager after outstanding clones
+finish; it deliberately leaves shared entries untouched.
+
+## Cache-aside and invalidation
+
+Use explicit application caching after authorization:
+
+```text
+Controller → authorize user/record → Service or Query Handler
+  → Cache lookup → hit: return value
+                 → miss: Repository → cache result with TTL → return value
+```
+
+Include tenant, user/ownership scope, representation/version, locale, filters and
+pagination wherever they affect a result. For example,
+`v1:tenant:7:user:42:orders:page:1` must not become a shared `orders` key across
+users. Do not cache authentication decisions, raw bearer tokens, or secrets using
+these examples. Never allow a cache hit to bypass the guard/record-level policy
+checks added in step 3.
+
+After a successful database write, invalidate affected keys. Cache/database writes
+are not one transaction; handle failed invalidation and concurrent stale readers
+with your application's consistency strategy (for example versioned keys or an
+outbox). TTL alone provides eventual expiration, not strict read-after-write
+consistency. No automatic get-or-load/single-flight locking, stampede protection,
+HTTP cache interceptor, or cross-backend transaction is provided.
+
+## Dependency injection and lifecycle
+
+```rust
+let cache = Cache::memory_provider(1000, 1_048_576)?;
+// Redis alternative: Cache::redis_provider(redis_config)
+let container = xecute::Container::builder().provider(cache).build()?;
+container.initialize_async().await?;
+let cache = container.resolve::<Cache>()?;
+// Use the cache, drain callers/jobs, then:
+container.shutdown_async().await?;
+```
+
+Memory provider registration creates the value immediately, but its cleanup hook
+still requires async container lifecycle. Redis connects at async startup. Module
+registration, exports/imports and isolated testing overrides work as before.
+Register one `Cache` provider; use concrete newtype adapters if a feature needs
+multiple independent caches in the same container.
+
+Repositories/services/query handlers can depend on `Arc<Cache>`. Workers must
+declare `ProviderKey::of::<Cache>()` in their queue factory so lifecycle shutdown
+drains the queue before closing the cache. See the
+[jobs/cache example](https://github.com/morshedulmunna/xecute/blob/main/xecute/examples/jobs_cache/main.rs):
+
+```sh
+cargo run -p xecute --example jobs_cache --features jobs,cache
+```
+
+Generated MVC/CQRS resources are not automatically rewritten to use caching. In
+generated servers, use the async initialization path described in the
+[lifecycle guide](skills/xecute/references/architecture/lifecycle.md), then
+retain the container for cleanup after HTTP requests and workers drain.
+
+## Tests and CI
+
+```sh
+# No external service needed:
+cargo test -p xecute --features cache --test cache
+
+# Redis config/timeout tests, without a live server:
+cargo test -p xecute --features cache-redis --test cache_redis
+
+# Explicit live Redis suite:
+TEST_REDIS_URL=redis://127.0.0.1:56379/ \
+  cargo test -p xecute --features cache-redis --test cache_redis -- --ignored
+```
+
+Memory tests cover exact expiry, non-sliding TTL, overwrite, LRU eviction, lazy
+expiry before eviction, serialization/type/size errors, concurrent access,
+invalidation, and lifecycle closure. Time tests use Tokio's paused clock.
+Redis tests cover separate clients, namespace isolation, server TTL/overwrite,
+JSON/size errors, wrong-type command failures, connection timeouts, redaction,
+and cleanup that preserves shared entries.
+
+Live tests are ignored by default, but explicitly invoking them without
+`TEST_REDIS_URL` fails with an actionable message. Tests use random namespaces and
+never flush Redis or alter unrelated keys. The dedicated Redis CI job runs these
+checks against a disposable service.
+
+Reference: [Redis SET with expiration](https://redis.io/docs/latest/commands/set/)
+and [Redis async connection management](https://docs.rs/redis/latest/redis/aio/struct.ConnectionManager.html).
+
+## Keep learning
+
+[CQRS buses and events](skills/xecute/references/integrations/cqrs.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# CQRS buses and events
+
+Documentation route: /docs/integrations/cqrs
+
+Use typed buses when you want central command/query dispatch or event subscribers. Generated CQRS already works through direct handler injection; adding buses is a separate application choice.
+
+Xecute's optional `cqrs` runtime feature provides typed `CommandBus`, `QueryBus`,
+and `EventBus` registries. Commands/queries dispatch to one handler; events fan
+out to zero or more subscribers. All three share ordered pipeline behaviors,
+explicit dispatch metadata, ordinary DI module validation, and caller-owned async
+execution.
+
+Enable the feature in your application's Cargo.toml:
+
+```toml
+[dependencies]
+xecute = { version = "0.1", features = ["cqrs"] }
+```
+
+The feature does not start a worker, open a database, require a broker, or spawn
+hidden tasks. These are in-process application buses, not a distributed messaging
+transport. CQRS does not require separate databases, event sourcing, or buses for
+every small application. Existing direct-handler CQRS generation remains valid.
+
+## Run the HTTP example
+
+From the repository root:
+
+```sh
+cargo run -p xecute --example cqrs --features cqrs
+
+# In another terminal:
+curl -i -X POST http://127.0.0.1:3000/users \
+  -H 'Content-Type: application/json' -d '{"name":"  Munna  "}'
+curl -i http://127.0.0.1:3000/users
+```
+
+The [example](https://github.com/morshedulmunna/xecute/blob/main/xecute/examples/cqrs/main.rs) separates controller, DTO, entity,
+repository, command/query handlers, event subscribers, module registrations and a
+shared pipeline policy. The write handler normalizes/validates a name, persists a
+user, then publishes `UserCreated` to audit and welcome subscribers. The query
+handler reads the same repository. Welcome handling records a demo action; it does
+not send email. Storage is bounded in-memory demonstration data, not durable user
+or audit storage. The HTTP example is public; add the [authentication guards](skills/xecute/references/integrations/auth.md)
+when protecting a real API.
+
+```text
+POST → DTO → Controller → CommandBus → Behaviors → CreateUserHandler → Repository
+                                                    └→ EventBus → Audit / Welcome
+GET  → Controller → QueryBus → Behaviors → ListUsersHandler → Repository
+```
+
+## Typed commands and queries
+
+A command declares its output and domain error; a handler supplies an async
+implementation. Queries have the same shape using `Query` / `QueryHandler`.
+
+```rust
+use std::{convert::Infallible, sync::Arc};
+use xecute::cqrs::{Command, CommandHandler, CommandBus, DispatchContext};
+
+struct Add { value: u64 }
+impl Command for Add {
+    type Output = u64;
+    type Error = Infallible;
+}
+
+struct AddHandler;
+impl CommandHandler<Add> for AddHandler {
+    async fn handle(&self, command: Add, _: DispatchContext)
+        -> Result<u64, Infallible>
+    {
+        Ok(command.value + 1)
+    }
+}
+
+let commands = CommandBus::builder()
+    .handler::<Add, _>(Arc::new(AddHandler))
+    .build()?;
+let result = commands.execute(Add { value: 41 }).await?;
+assert_eq!(result, 42);
+```
+
+For closures/functions, use `.handler_fn::<Add, _, _>(|command, context| async move
+{ ... })`. Messages must be `Send + Sync + 'static`; outputs/errors must be
+`Send + 'static`. A message does not need `Clone`. A concrete Rust message type
+identifies its handler; strings and serialized type names are not routing keys.
+Command and query registries are separate. Their traits express intent; the query
+trait does not technically prevent application code from writing to a database.
+
+Exactly one handler per command/query type is allowed. Duplicates fail `build()`
+or `into_provider()` instead of silently replacing a handler. Dispatch of an
+unregistered message returns `BusError::MissingHandler` before behaviors run.
+Registries are immutable after construction and safe to clone/share concurrently.
+A bus clone shares the same registered handler instances.
+
+### Error mapping
+
+`execute` returns `Result<Output, DispatchError<YourError>>`:
+
+- `DispatchError::Handler(error)` preserves the handler's typed domain error.
+- `DispatchError::Bus(error)` represents registration/routing/pipeline failure.
+
+Map these deliberately at your HTTP boundary. For example, a known duplicate
+resource can become 409, a validation failure 422, and an unexpected bus failure
+500. Do not serialize arbitrary domain errors or call their Display output in a
+public HTTP response. Bus errors contain static codes/type names, but internal
+configuration/type details still should not be exposed as client diagnostics.
+There is no automatic HTTP status mapping for arbitrary CQRS errors.
+
+## Dependency injection and module boundaries
+
+Register handlers with the ordinary DI container, then bind them to a bus:
+
+```rust
+use xecute::{ModuleDefinition, Scope};
+use xecute::cqrs::CommandBus;
+
+let commands = CommandBus::builder()
+    .handler_provider::<Add, AddHandler>()
+    .into_provider(Scope::Singleton)?;
+
+// Register AddHandler using its Provider definition, or a concrete value:
+let module = ModuleDefinition::new("math")
+    .provider(xecute::ProviderDefinition::value(AddHandler))
+    .provider(commands);
+```
+
+Build `ModuleGraph` as usual and initialize the container before serving. Resolve
+or inject `Arc<CommandBus>` and call it from a controller/service. The runnable
+example uses `#[derive(Injectable)]` for its controller and handlers. Configured
+buses are registered with their builder's `into_provider`, not by putting bare
+`CommandBus` / `QueryBus` / `EventBus` types into `#[module(providers = [...])]`.
+Those types cannot infer application-specific registrations on their own.
+
+`handler_provider` and `behavior_provider` add declared dependencies to the bus's
+provider definition. Existing missing-provider, module import/export, cycle and
+scope validation applies. A handler or behavior in another module must be exported
+and its owning module imported by the bus's module. Missing providers fail graph
+construction; resolution/factory errors fail bus construction/startup.
+
+Bindings resolve handlers **once when the bus is constructed**, not on each
+execute. The resulting bus retains handler Arcs, not a `Container`; this avoids
+container → singleton cache → bus → container reference cycles. Singleton buses
+can retain only compatible provider scopes. For request-scoped handlers, register
+the bus with `Scope::Request` and resolve it through the active `RequestScope` or
+`scoped_router` / `Inject<CommandBus>`. Different request buses then retain their
+own request handler instances while sharing permitted singleton dependencies.
+A transient handler bound into a singleton bus is retained for that bus's lifetime;
+use a request/transient bus when new handler instances per resolution are needed.
+
+For manual binding, `.build_with(&container)` uses an existing root container;
+`.build_in(&request_scope)` uses one request scope. `.build()` is for direct
+Arc/closure registrations and reports `ProviderContextRequired` if a DI-backed
+registration has no binding context. Direct Arc/closure captures are app-owned
+objects; their dependency lifetimes cannot be inferred or validated by the bus.
+
+Async handler dependencies from step 1 work normally: call `initialize_async()`
+before routing traffic. Stop in-flight dispatches before calling container
+shutdown and closing their database/cache dependencies. Buses do not add a
+separate lifecycle hook or detach handler work. A handler Arc can outlive its
+container when retained elsewhere; do not execute it after its resources close.
+
+The legacy `Injector` can resolve an explicitly registered `.value(bus)`; it does
+not synthesize an empty bus. Native `Container` / `ModuleGraph` is preferred for
+configured buses and provider lifetimes.
+
+## Explicit dispatch context
+
+```rust
+#[derive(Clone)]
+struct CorrelationId(String);
+
+let context = DispatchContext::default()
+    .with_value(CorrelationId("request-123".into()));
+let result = commands.execute_with(Add { value: 41 }, context).await?;
+```
+
+`context.value::<CorrelationId>()` reads typed metadata. Context clones share Arc
+values but have independent maps, so replacing a value on a cloned context does
+not modify another dispatch's metadata map. Values with interior mutability still
+follow their own synchronization rules. Context Debug output reports only value
+count and does not print payloads.
+
+HTTP principals, request IDs, transactions and cancellation tokens are not
+implicitly propagated. Extract the verified `AuthenticatedUser` or server-issued
+request ID, then pass the required trusted values explicitly. Do not put raw
+bearer tokens or an entire HTTP request into dispatch context. Reusable command
+handlers must enforce business invariants for non-HTTP callers too; controller
+DTO validation alone does not protect job/CLI/event entry points.
+
+## Shared pipeline behaviors
+
+A `Behavior` wraps a continuation for a registered command/query or complete event
+publication. Register outer-to-inner order with `.behavior(Arc::new(...))` or
+`.behavior_provider::<YourBehavior>()`.
+
+```rust
+use xecute::cqrs::{Behavior, BusError, DispatchFuture, Next};
+
+struct RequireCorrelation;
+impl Behavior for RequireCorrelation {
+    fn handle<'a>(&'a self, next: Next<'a>) -> DispatchFuture<'a> {
+        Box::pin(async move {
+            if next.context().value::<CorrelationId>().is_none() {
+                return Err(BusError::Rejected("correlation_required"));
+            }
+            let response = next.run().await?;
+            let succeeded = response.is_success();
+            // Record duration/result metadata without logging submitted payloads.
+            let _ = succeeded;
+            Ok(response)
+        })
+    }
+}
+```
+
+`Next` exposes `info()` (Command/Query/Event and concrete type),
+`message::<YourMessage>()`, and `context()`. `next.run()` consumes the continuation,
+so downstream execution is invoked at most once through that continuation.
+Behaviors can validate/authorize, reject, inspect a typed payload before
+continuing, or inspect the result afterward. This order is verified:
+
+```text
+first before → second before → handler → second after → first after
+```
+
+A handler's domain failure is still a completed pipeline response;
+`response.is_success()` is false. For typed inspection, use
+`response.value::<Result<Output, DomainError>>()`. Event responses instead contain
+`EventReport`, and success is false if any subscriber failed. A pipeline rejection
+or panic returns a `BusError` without a normal response. As with ordinary async
+code, code after `next.run().await?` does not run when that await returns an error;
+match the result explicitly when cleanup/logging must cover failures.
+
+A trusted behavior may intentionally short-circuit with
+`DispatchResponse::from_result::<Output, DomainError>(Ok(cached_value))` or
+`from_event_report(report)`. The final bus checks the concrete response contract;
+returning the wrong result type fails with `InvalidResponse`. Only implement
+caching for query types/authorization scopes where it is correct. A typed bus
+pipeline is not an HTTP guard and does not automatically apply JWT policies.
+
+Behaviors have no automatic retry or transaction wrapper. Retrying an entire
+command or a whole event publication can repeat side effects. A SQL transaction
+must be owned/passed explicitly by application handlers or transaction-aware
+adapters; there is no implicit transaction propagation through DispatchContext.
+
+## Event fan-out and observable failures
+
+```rust
+use std::sync::Arc;
+use xecute::cqrs::{Event, EventBus, EventError};
+
+struct UserCreated { id: String }
+impl Event for UserCreated {}
+
+let events = EventBus::builder()
+    .handler_fn::<UserCreated, _, _>("audit", |event, _| async move {
+        let _ = event.id.as_str();
+        Ok::<(), EventError>(())
+    })
+    .handler_fn::<UserCreated, _, _>("welcome", |_, _| async move {
+        Err(EventError::Handler("email_unavailable"))
+    })
+    .build()?;
+let report = events.publish(UserCreated { id: "user-42".into() }).await?;
+assert_eq!(report.attempted, 2);
+assert_eq!(report.succeeded, 1);
+assert!(!report.is_success());
+```
+
+For structs, implement `EventHandler<E>` and use `.handler::<E, H>(Arc<H>)` or
+`.handler_provider::<E, H>()`. Each subscriber receives an `Arc<E>` and an explicit
+context; one publication shares the same event payload across subscribers. No
+`Clone` implementation is required on the event. Subscriber names must be
+nonblank and unique **within one event type**. Direct typed subscribers use the
+concrete handler type name; closures use their explicit name. Duplicate names are
+startup/build errors.
+
+Subscribers run sequentially in registration order. A returned `EventError` or
+unwinding panic is collected in `EventReport.failures`, and later subscribers
+still run. Reports contain attempted/succeeded counts and ordered named failures.
+A publication with no subscribers is a successful empty report. Behaviors wrap
+the whole publication; a rejecting behavior can prevent fan-out entirely.
+
+`publish(...).await` completes only after subscriber work finishes. It does not
+mean queued delivery and does not automatically create a background job. There
+are no implicit subscriber retries, deadlines, dead-letter records or persistent
+subscriptions. If delivery must be asynchronous, explicitly enqueue work using
+[jobs](skills/xecute/references/integrations/jobs.md), and remember that step 4's queue is also process-local.
+
+Ordinary unwinding panics during handler/behavior execution are converted to safe
+bus/event failure results. The default Rust panic hook still runs and may log the
+panic text; do not panic with secrets. `panic = "abort"`, process failures and
+panicking destructors are not recoverable delivery guarantees. Recovery does not
+undo state changes or repair a poisoned/mutated application resource.
+
+## Write consistency, workflows, and sagas
+
+Publish domain events deliberately after successful repository persistence. A
+failed subscriber does **not** roll back a committed write or earlier subscriber
+side effects. In the example, the user remains created even if event delivery is
+incomplete; delivery failure is reported separately instead of returning a false
+"creation rolled back" result.
+
+A crash between commit and publish can lose notifications. Use a transactional
+outbox in PostgreSQL plus a durable delivery worker when notifications must survive
+that gap. Neither the in-process EventBus nor the process-local JobQueue provides
+an outbox, exactly-once execution or event sourcing. Persist idempotency state and
+use stable event/operation IDs when retrying side effects.
+
+An event subscriber can coordinate a follow-up command through an explicitly
+supplied command bus. Keep dependencies acyclic: if a command handler depends on
+EventBus and an event subscriber depends on the same CommandBus containing that
+handler, ModuleGraph correctly rejects the circular dependency. Use a separate
+newtype-wrapped follow-up command registry, explicit orchestration, or a durable
+outbox boundary rather than hiding the cycle with a retained Container.
+Long-running persisted sagas, compensation state machines, broker transports,
+aggregate event stores and replay are not implemented by this feature.
+
+## Cancellation and deadlines
+
+Execution futures remain owned by the caller. Cancelling an execute drops its
+current handler/pipeline future; cancelling event publication leaves completed
+subscriber side effects intact and drops the current subscriber before later
+subscribers run. No internal task continues work in the background. Application
+handlers can still spawn their own tasks, so their ownership is your responsibility.
+
+There is no automatic deadline. Use your HTTP request timeout or an explicit
+`tokio::time::timeout` when appropriate. Timeout/cancellation is not a transaction
+rollback guarantee for already completed database/remote operations. Apply the
+same idempotency and cleanup rules as other async application code.
+
+## Adopt in generated MVC/CQRS applications
+
+`xecute g resource user` still emits direct
+`Controller → Command/Query Handler → Repository` calls in CQRS mode. Existing
+features are not rewritten automatically, and the CLI currently does not enable
+this runtime feature or create bus registries by default. Adoption is explicit:
+
+1. Enable the runtime's `cqrs` feature, using the local runtime path until release.
+2. Implement `Command`/`Query` and their handler traits for existing command/query
+   types. A trait handler can delegate to your existing `.execute(...)` method.
+3. Add handler-provider registrations to the configured buses and add their
+   `into_provider(...)` definitions to the owning ModuleDefinition. Export/import
+   dependencies as required.
+4. Inject `Arc<CommandBus>` / `Arc<QueryBus>` into the controller and map
+   `DispatchError` to safe HTTP/domain responses.
+5. Register event subscribers and explicitly publish at the chosen write boundary.
+
+Use the complete example's module/controller code as the reference. MVC services
+may also call buses; choosing a bus does not require moving every operation into
+CQRS. Keep HTTP DTOs under `dto/` and domain/application messages under
+`commands/`, `queries/` and `events/`.
+
+## Tests
+
+```sh
+cargo test -p xecute --features cqrs,testing --test cqrs --example cqrs
+cargo check -p xecute --no-default-features
+```
+
+Tests cover typed outputs/domain errors, duplicate/missing handlers, pipeline
+ordering/short circuits/response validation, command/query/event metadata, event
+fan-out and panic continuation, empty/unrelated subscriptions, DI visibility,
+request scope isolation, provider overrides, invalid dependency cycles, absence of
+container reference cycles, concurrent contexts, caller cancellation, and the HTTP
+controller → buses → handlers → repository → subscribers example.
+
+Reference: [NestJS CQRS concepts](https://docs.nestjs.com/recipes/cqrs) and
+[FutureExt unwind handling](https://docs.rs/futures-util/latest/futures_util/future/trait.FutureExt.html).
+
+## Keep learning
+
+[Choose your next guide](skills/xecute/references/index.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Quality checks
+
+Documentation route: /docs/testing/checks
+
+Run these commands from the generated application root before shipping a change. The page distinguishes application checks from checks for contributors working on Xecute itself.
+
+In a generated application:
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features --locked -- -D warnings
+cargo test --all-targets --all-features --locked
+cargo build --release --locked
+```
+
+New standalone projects resolve dependencies with `cargo generate-lockfile` during
+setup, including `--runtime-path` projects. This selects the latest stable versions
+within the template’s compatibility ranges, instead of copying a bundled lockfile.
+Registry access is required unless Cargo is configured for offline cached resolution.
+Resolution failures return an error and preserve generated files; fix registry/network
+access and rerun `cargo generate-lockfile` in the project. Commit `Cargo.lock` for
+reproducible builds. Breaking major upgrades require updated templates. Existing
+workspace apps retain shared dependency versions when adding another app; setup
+does not force upgrades across an existing workspace.
+
+Resource HTTP tests verify rejection before persistence and visibility of created
+records through subsequent reads. Server tests cover configuration, quota and
+concurrency behavior, timeouts, body limits, response envelopes, CORS, request IDs,
+logging, and Swagger routes. The workspace middleware tests cover scope ordering,
+early returns, validation boundaries, and compatibility with legacy controllers.
+
+The generator also includes CI, rustfmt/Clippy configuration, EditorConfig,
+Dependabot configuration, and `deny.toml`. To run the dependency policy check:
+
+```sh
+cargo install cargo-deny --locked
+cargo deny --locked check
+```
+
+Document public items with `///` and modules with `//!`. Missing documentation
+produces compiler warnings; Clippy CI treats warnings as errors.
+
+## Keep learning
+
+[Testing modules and HTTP](skills/xecute/references/testing/modules.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Testing modules and HTTP
+
+Documentation route: /docs/testing/modules
+
+Test HTTP behavior through a real router and replace providers when a test needs controlled data. Start with the generated feature tests, then use overrides for external dependencies.
+
+Enable the runtime's optional test helpers only for development:
+
+```toml
+[dev-dependencies]
+xecute = { version = "0.1.8", features = ["testing"] }
+```
+
+Generated manifests already include this entry. `TestingModule` compiles isolated
+containers, applies overrides before initialization, and validates the final
+dependency graph. Unknown or repeated overrides are errors, preventing a silently
+unused mock. Values replace the same registered Rust type; for trait-based mocks,
+use a concrete adapter containing `Arc<dyn YourTrait>` and replace that adapter.
+Production containers remain unchanged.
+
+```rust
+use std::sync::Arc;
+use xecute::testing::{TestApp, TestingModule};
+
+let mut module = TestingModule::new();
+for definition in crate::app_module::AppModule::definitions() {
+    module = module.module(definition);
+}
+// Example: module = module.override_value(DatabaseGateway(Arc::new(FakeDatabase)));
+let container = Arc::new(module.compile()?);
+let routes = crate::app_module::AppModule::router_with_container(container)?;
+let app = TestApp::new(crate::server::router(routes, &crate::configs::Config::default()));
+
+let response = app.post("/example")
+    .json(&serde_json::json!({"name": "Example"}))
+    .send().await?
+    .assert_status(axum::http::StatusCode::CREATED);
+let body: serde_json::Value = response.json()?;
+```
+
+Run these async helpers inside a Tokio runtime, such as `#[tokio::test]`.
+The client runs the actual Router and middleware without a socket. It supports
+arbitrary HTTP methods through `.request`, common method helpers, raw bodies,
+headers, JSON payloads, and `.peer(SocketAddr)` for limiter tests. Loopback peer
+information is supplied by default. Responses expose status, headers, bounded
+bytes, typed JSON, and chainable `.assert_status`/`.assert_json` methods. Invalid
+requests return test errors rather than panicking. Request and body collection
+have a five-second timeout and a 1 MiB response limit; adjust with
+`TestApp::timeout` and `response_limit`. This tests HTTP behavior in-process;
+network/TLS/deployment behavior still belongs in deployment smoke tests.
+
+The generated `src/tests/application.rs` demonstrates isolated container startup
+and safe mapped errors. Resource tests demonstrate JSON validation and storage
+through the same test client. The runtime test suite also covers trait adapters,
+mock isolation, concurrent initialization, nested request scopes, and cleanup.
+
+## Keep learning
+
+[Runnable examples](skills/xecute/references/testing/examples.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Runnable examples
+
+Documentation route: /docs/testing/examples
+
+Run these commands from the repository root. Each example is implemented under
+`xecute/examples`; the associated tests compile its application setup. Clone the repository to run
+these examples; applications can enable the same APIs through their Cargo features.
+
+| Example | Command | Requirements |
+| --- | --- | --- |
+| Module imports and request inputs | `cargo run -p xecute --example module_imports` | HTTP port 3000 |
+| Async resource lifecycle | `cargo run -p xecute --example async_lifecycle` | No external service |
+| PostgreSQL repository/transactions | `cargo run -p xecute --example postgres --features postgres` | Development `DATABASE_URL` |
+| JWT guards and permissions | `cargo run -p xecute --example auth --features auth` | Random `JWT_SECRET` of at least 32 bytes; port 3000 |
+| Worker with TTL cache | `cargo run -p xecute --example jobs_cache --features jobs,cache` | No external service |
+| CQRS buses and event subscribers | `cargo run -p xecute --example cqrs --features cqrs` | HTTP port 3000 |
+| Validated private file upload | `cargo run -p xecute --example file_upload --features upload` | Private temporary storage; port 3000 |
+
+Run one HTTP example at a time when using the same listening port. Read each
+example's module/controller comments for curl commands and behavioral details.
+The PostgreSQL example runs migrations and inserts data; use its disposable setup.
+
+## Focused checks
+
+```sh
+cargo test -p xecute --example module_imports
+cargo test -p xecute --features testing --test async_lifecycle
+cargo test -p xecute --features auth --test auth_http --test guards_http --example auth
+cargo test -p xecute --features jobs,cache,testing --test jobs --test cache --example jobs_cache
+cargo test -p xecute --features cqrs,testing --test cqrs --example cqrs
+```
+
+## External-service suites
+
+The [PostgreSQL guide](skills/xecute/references/integrations/postgres.md) and
+[Redis cache guide](skills/xecute/references/integrations/cache.md) explain disposable services and
+credentials. Live tests are ignored in the normal suite and fail clearly when
+explicitly invoked without the required environment variable.
+
+```sh
+# Dedicated database; role needs permission to create test databases:
+cargo test -p xecute --features postgres,testing --test postgres -- --ignored
+
+# Dedicated Redis instance; tests use separate random namespaces:
+cargo test -p xecute --features cache-redis --test cache_redis -- --ignored
+```
+
+Set `TEST_DATABASE_URL` or `TEST_REDIS_URL` as described in those guides before
+running the corresponding command. Repository CI has explicit database/Redis
+service jobs. No live credential is stored in the docs.
+
+## Documentation snippets versus complete applications
+
+Guide snippets show the relevant API or integration fragment. They are not always
+complete standalone programs. For executable application boundaries, use the
+complete examples and generated-app tests. A code block documenting a placeholder
+attribute does not make it an operational lifecycle/interceptor feature.
+
+---
+
+# Deployment
+
+Documentation route: /docs/operations/deployment
+
+Deploy a generated application after it builds and passes tests locally. Follow the release/container instructions and supply your own production configuration and secrets.
+
+From a generated application using registry dependencies:
+
+```sh
+docker build --tag my-app:local .
+docker run --rm --name my-app \
+  --read-only --cap-drop=ALL --security-opt=no-new-privileges \
+  --pids-limit=128 --memory=512m --cpus=1 --stop-timeout=15 \
+  -p 127.0.0.1:3000:3000 my-app:local
+```
+
+The Dockerfile builds a stripped static musl binary for amd64 or arm64 and runs
+it in `gcr.io/distroless/static-debian13:nonroot`. Its container listener defaults
+to `0.0.0.0:3000`. The final image contains no build tools, shell, package manager,
+or curl. Configure HTTP health probes in the orchestrator.
+
+Pass runtime configuration through environment variables or the deployment's
+secret mechanism. `.env` is excluded from source control and the Docker context.
+Allow a stop timeout longer than `SHUTDOWN_GRACE_SECONDS`. Local runtime path
+dependencies require a custom Docker build context. Native dependencies must
+support static musl linking if you retain the generated build configuration.
+
+Replace in-memory repositories with durable storage, add application-specific
+authentication/authorization, and terminate TLS at your ingress. Add readiness
+checks for external dependencies when introducing them.
+
+## Keep learning
+
+[Development and packages](skills/xecute/references/operations/contributing.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Development and packages
+
+Documentation route: /docs/operations/contributing
+
+This page is for changing Xecute itself, rather than building an application with it. It explains the repository packages and contributor checks.
+
+Repository: [morshedulmunna/xecute](https://github.com/morshedulmunna/xecute).
+
+| Package | Role | Documentation |
+| --- | --- | --- |
+| `xecute` | Runtime, DI container, validation, HTTP middleware, OpenAPI helpers | [Runtime README](https://github.com/morshedulmunna/xecute/blob/main/xecute/README.md) |
+| `xmacros` | Injection, module, controller, and route procedural macros | [Macro README](https://github.com/morshedulmunna/xecute/blob/main/xmacros/README.md) |
+| `xecute-cli` | `xecute` binary and project/resource templates | [CLI README](https://github.com/morshedulmunna/xecute/blob/main/xecute-cli/README.md) |
+
+From the repository root:
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cargo install --path xecute-cli --locked --force
+```
+
+Use `--runtime-path /absolute/path/to/xecute/xecute` when exercising local runtime
+changes. CLI template changes affect newly generated files; they do not rewrite
+existing applications automatically.
+
+## Keep learning
+
+[Troubleshooting](skills/xecute/references/operations/troubleshooting.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Troubleshooting
+
+Documentation route: /docs/operations/troubleshooting
+
+Find the symptom closest to yours in the table below. Read the full command output first, and check whether you are in the generated application or the Xecute repository.
+
+| Symptom | What to check |
+| --- | --- |
+| Installed CLI lacks `run dev` or middleware support | Update to CLI 0.1.7 or later and use runtime/macros 0.1.5 or later |
+| Generated app cannot find `Application` | Update its runtime/macros to 0.1.5 or later |
+| Locked build says the lockfile must change | Run `cargo generate-lockfile`, review it, and commit the result |
+| Generator cannot register a resource | Run from the project root and retain the `// xecute:` markers in `app_module.rs` |
+| Resource already exists | Choose another feature name or edit the existing feature; generators do not overwrite it |
+| Middleware annotation produces an ordering error | Place it below the owning `#[controller]` or `#[routes]` macro |
+| Wrong payload reaches a manually invoked handler | Automatic validation occurs through the generated HTTP extractor, not arbitrary Rust method calls |
+| Browser cross-origin requests fail | Configure exact `cors.origins` plus the required methods and headers |
+| Many clients share a rate-limit quota | Check whether a reverse proxy is the direct socket peer |
+| Stored records disappear after restart | The generated repository is in memory; add durable storage |
+| Container cannot resolve a local runtime dependency | Use registry dependencies or adapt the Docker build context |
+
+## Keep learning
+
+[Scope and limitations](skills/xecute/references/operations/limitations.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Scope and limitations
+
+Documentation route: /docs/operations/limitations
+
+Check this page before planning around a capability. It separates generated behavior from features you must implement or configure in your application.
+
+Xecute provides DI, module metadata, controller adapters, validation, HTTP
+middleware, API documentation, and starter application infrastructure. It does
+not currently generate database-backed repositories, complete CRUD operations,
+login/session scaffolding, broker transports, or event sourcing. Optional
+SQLx PostgreSQL integration supports lifecycle-managed pools, migrations, and native
+transactions; see the [PostgreSQL guide](skills/xecute/references/integrations/postgres.md).
+
+The middleware API implements app, controller, and route scopes. `#[module]`
+describes DI boundaries and does not automatically attach HTTP middleware.
+Executable guards support application, controller, and route policies. Optional
+JWT authentication and role/permission checks are documented in the
+[authentication guide](skills/xecute/references/integrations/auth.md). Optional [background jobs](skills/xecute/references/integrations/jobs.md)
+provide bounded process-local workers and interval schedules; [TTL caching](skills/xecute/references/integrations/cache.md)
+supports memory and Redis backends. Optional [CQRS buses](skills/xecute/references/integrations/cqrs.md)
+provide typed command/query dispatch, event fan-out and shared pipelines; direct
+handler CQRS remains supported. Reserved attribute markers, including
+interceptors, lifecycle attributes, and exception decorators, are not complete
+execution systems. Async lifecycle
+behavior is available through explicit provider registration methods:
+`singleton_async`, `on_init`, and `on_shutdown`; await `initialize_async` before
+serving and `shutdown_async` after request draining. See the
+[runtime lifecycle guide](skills/xecute/references/architecture/lifecycle.md).
+
+Licensed under **Apache-2.0**.
+
+## Keep learning
+
+[Choose your next guide](skills/xecute/references/index.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Cargo feature reference
+
+Documentation route: /docs/reference/features
+
+The runtime's default feature set is empty. Enable only the optional modules used
+by your application. Async lifecycle, DI, controllers, custom guards, middleware,
+configuration, error envelopes and versioning are part of the base runtime.
+
+| Flag | Enables | Required setup |
+| --- | --- | --- |
+| `auth` | JWT verification, verified principal and role/permission policies | Trusted key/issuer/audience and guards |
+| `postgres` | SQLx PostgreSQL pool/migrations/transactions | URL, migrations and repository/provider registration |
+| `jobs` | In-process workers and interval scheduling | Queue limits, handlers and lifecycle draining |
+| `cache` | Bounded memory TTL/LRU cache | Explicit keys, value limits and TTLs |
+| `cache-redis` | Redis backend; includes `cache` | Redis URL, namespace, timeout and provider |
+| `cqrs` | Typed command/query/event buses and behaviors | Typed messages/handlers and configured registries |
+| `testing` | Isolated TestingModule and in-process HTTP client | Usually enable in dev-dependencies |
+| `upload` | Streaming multipart and private local storage | Upload policy/storage and HTTP body limits |
+| `upload-s3` | S3 storage adapter; includes `upload` | Bucket/region and trusted AWS configuration |
+
+## Enable features in your application
+
+Add the flags you need to the runtime dependency. Keep the same dependency version
+in normal and dev dependencies; enable `testing` for test helpers.
+
+```toml
+[dependencies]
+xecute = { version = "0.1", features = ["auth", "cqrs"] }
+
+[dev-dependencies]
+xecute = { version = "0.1", features = ["testing"] }
+```
+
+Cargo unifies feature selections for the same dependency source. Keep runtime and
+dev-dependency sources consistent. In generated workspaces, declare the source in
+`[workspace.dependencies]` and select app/test features through inherited entries.
+
+## Unsupported assumptions
+
+Feature flags expose runtime APIs; they do not automatically add configured
+modules, change controller flow, create database tables or protect endpoints.
+There are no ORM-specific Diesel/SeaORM/MongoDB flags, WebSocket gateways, remote
+message transports, automatic HTTP cache decorators or persisted cron/saga
+features in this implementation. Compose other Rust libraries explicitly when
+those capabilities are required.
+
+The docs validation script compares this table with the actual runtime manifest
+so stale or invented flag names are caught during documentation checks.
+
+---
+
+# Release process
+
+Documentation route: /docs/reference/releases
+
+This page is for maintainers publishing Xecute packages. Application users normally want the CLI update guide instead.
+
+See [CHANGELOG.md](skills/xecute/references/reference/changelog.md) for version-by-version changes and
+[GitHub Releases](https://github.com/morshedulmunna/xecute/releases) for published
+release notes. Git tags alone do not create GitHub Release pages.
+
+Maintain an `## [VERSION] - YYYY-MM-DD` section in `CHANGELOG.md` before releasing.
+Publish the crate, then push the matching CLI tag, such as `v0.1.10`. The
+[release workflow](https://github.com/morshedulmunna/xecute/blob/main/.github/workflows/release.yml) copies that exact changelog
+section into the GitHub Release body and adds the versioned installation command.
+It creates a missing release or updates the notes of an existing release without
+moving its source tag. Historical CLI tags can be backfilled through the
+workflow's **Run workflow** input.
+
+Changelog/workflow changes on `main` also synchronize the latest changelog
+version when its tag already exists; an untagged future version is deferred.
+This initializes the existing latest release when release automation is first
+added. It does not publish crates or create version tags automatically.
+
+Preview the release body locally:
+
+```sh
+python3 scripts/release_notes.py --tag v0.1.10 --output /tmp/xecute-release-notes.md
+```
+
+When manually using GitHub's **Create a new release** page, **Generate release
+notes** uses the PR-label categories in [.github/release.yml](https://github.com/morshedulmunna/xecute/blob/main/.github/release.yml).
+For the curated notes in this repository, use the changelog-backed workflow or
+paste the corresponding changelog section into the release description.
+
+## Keep learning
+
+[Changelog](skills/xecute/references/reference/changelog.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# Changelog
+
+Documentation route: /docs/reference/changelog
+
+Review changes before updating an existing application. Updating the CLI does not rewrite generated application files.
+
+Changes are grouped by published CLI version, newest first. Runtime and macro
+versions are listed when they changed alongside a CLI release. Updating the CLI
+does not rewrite existing application source; generator changes apply to newly
+created projects and resources.
+
+## [Unreleased]
+
+### Added
+
+- Optional typed CommandBus/QueryBus dispatch and observable EventBus fan-out,
+  with immutable registrations, shared execution behaviors, explicit typed context,
+  DI scope/module validation, cancellation ownership, and safe panic reports.
+- Add a complete HTTP CQRS example with separate DTOs and event subscribers,
+  an adoption/architecture guide, and routing/pipeline/DI/failure/cancellation tests.
+
+- Optional bounded in-process background queues with receipts, retry/timeout
+  policies, panic isolation, graceful draining and fixed-interval schedules.
+- Optional bounded memory TTL/LRU cache and namespaced Redis cache, with explicit
+  invalidation, safe errors and lifecycle cleanup. Add a worker/cache example,
+  guides, deterministic unit tests, and live Redis CI coverage.
+
+- Executable application/controller/route guards and additive role/permission
+  policies. Add optional pinned HS256/RS256 bearer authentication, verified-user
+  extraction, DI-backed verifier resolution, and safe 401/403 responses.
+- Add an authentication guide and runnable demo, real signature and HTTP tests,
+  and macro checks for invalid/empty authorization declarations.
+
+- Optional SQLx PostgreSQL integration with validated/redacted configuration,
+  lifecycle-managed connection pools, startup migrations, readiness checks, and
+  native transactions. Include a module/repository example, setup/deployment
+  documentation, and live PostgreSQL CI tests.
+
+- Async singleton factories with dependency-ordered `initialize_async`, async
+  startup/cleanup hooks, and explicit reverse-order `shutdown_async`.
+- Serialize lifecycle calls across container clones, roll back failed startup,
+  preserve dependency validation across await points, and support cancellation
+  recovery through explicit shutdown.
+- Add `TestingModule::compile_async`, a runnable lifecycle example, and tests for
+  ordering, concurrency, failures, cancellation, overrides, and validation.
+
+## [0.1.19] - 2026-10-27
+
+Packages: `xecute-cli 0.1.19`, unchanged `xecute 0.1.9` and `xmacros 0.1.7`.
+
+### Changed
+
+- Generate CQRS resources as controller → command/query handler → repository.
+  Handlers inject the shared repository directly; create handlers retain name
+  normalization. Remove the mandatory forwarding service and its registrations.
+  MVC resources retain controller → service → repository. Existing apps are not
+  rewritten automatically.
+
+## [0.1.18] - 2026-10-27
+
+Packages: `xecute-cli 0.1.18`, unchanged `xecute 0.1.9` and `xmacros 0.1.7`.
+
+### Added
+
+- Include module imports/exports guidance and an imports section in both MVC and
+  CQRS resource module templates.
+- Document controller inputs in both resource templates: validated JSON, path
+  parameters, query strings, headers, cookies, forms, text, bytes, middleware
+  extensions, connection info, and multipart uploads, with handler examples.
+- Add a runnable module-import example demonstrating exported service injection,
+  request extraction, validation, and HTTP checks in the source repository.
+
+## [0.1.17] - 2026-10-24
+
+Packages: `xecute-cli 0.1.17`, `xecute 0.1.9`, and `xmacros 0.1.7`.
+Runtime and macro releases update documentation and package descriptions only.
+
+### Documentation
+
+- Describe Xecute consistently as application architecture tools and macros built
+  on Axum, rather than a separate framework, across READMEs, generated project
+  documentation, crate descriptions, and crate-level documentation.
+
+### Fixed
+
+- Initialize versioning configuration directly in generated root-route tests so
+  Clippy passes with `--all-targets --all-features -- -D warnings`.
+
+## [0.1.16] - 2026-10-24
+
+Packages: `xecute-cli 0.1.16`, unchanged `xecute 0.1.8` and `xmacros 0.1.6`.
+
+### Changed
+
+- Emit only the `server listening` startup log. Serve the bound address, local URL,
+  enabled Swagger/OpenAPI and versioned documentation paths, and static mount at
+  `GET /` instead of announcing each endpoint in separate logs.
+
+### Fixed
+
+- Generate shared lint policies in `[workspace.lints]` and only
+  `[lints] workspace = true` in workspace apps, preserving root lint customizations.
+
+## [0.1.15] - 2026-10-24
+
+Packages: `xecute-cli 0.1.15`, unchanged `xecute 0.1.8` and `xmacros 0.1.6`.
+
+### Changed
+
+- Generate workspace tooling, Git settings, Docker ignore rules, and GitHub
+  configuration once at the root rather than duplicating them in each app.
+
+- Centralize generated workspace dependency versions and paths in the root
+  `[workspace.dependencies]`. Apps inherit dependencies with `workspace = true`,
+  retaining their own feature selections and test-only runtime features.
+- Adding apps and generating resources preserves existing shared dependency
+  definitions. Explicit app runtime paths update the shared workspace runtime.
+
+## [0.1.14] - 2026-10-24
+
+Packages: `xecute-cli 0.1.14`, unchanged `xecute 0.1.8` and `xmacros 0.1.6`.
+
+### Added
+
+- `xecute new <project|.> --workspace` scaffolds a Cargo workspace with its first
+  application under `apps/`, a shared lockfile, tooling, and workspace CI.
+- `xecute g apps <app_name>` and `xecute generate apps <app_name>` add applications
+  that inherit the workspace architecture, with `--mvc` and `--cqrs` overrides.
+- Workspace applications retain feature modules, application configuration,
+  static files, resource generators, tests, and Dockerfiles built from the
+  workspace root. Local runtime paths can be inherited or overridden.
+- Integration coverage for workspace membership, default MVC, CQRS selection,
+  resource generation, architecture overrides, in-place creation, and conflicts.
+
+### Changed
+
+- MVC remains the default architecture for new projects and workspaces.
+- Resolve newly added workspace members while retaining existing locked
+  dependency versions.
+
+## [0.1.13] - 2026-10-23
+
+Packages: `xecute-cli 0.1.13`, `xecute 0.1.8`, and unchanged `xmacros 0.1.6`.
+
+### Added
+
+- Runnable file-upload controller example with private local storage, multipart
+  OpenAPI metadata, size/type validation, and HTTP persistence/error tests.
+
+### Changed
+
+- Move generated application settings to config/AppConfig.toml, updating startup,
+  Docker, and documentation paths.
+
+- New projects generate only v1; remove the built-in v2 example and uploads module,
+  upload configuration, and default upload/S3 features. Runtime upload and versioning
+  APIs remain available for custom modules.
+
+## [0.1.12] - 2026-10-23
+
+Packages: `xecute-cli 0.1.12`, `xecute 0.1.7`, and `xmacros 0.1.6`.
+
+### Added
+
+- Streaming multipart uploads with actual size/count limits, MIME signature checks,
+  private staging, generated keys, checksums, local atomic storage, optional official
+  AWS S3 storage, and handled-failure batch rollback.
+- Explicit /v1 and /v2 route groups with independently validated OpenAPI contracts,
+  version-specific Swagger pages, and generated upload/version examples.
+- Cargo feature selection through `xecute run dev --features`, plus optional S3
+  container builds and configuration in AppConfig.toml with credentials kept outside TOML.
+
+- Typed environment configuration with required/optional values, conversion, defaults,
+  numeric bounds, JSON parsing, custom invariants, and redacted secret/error handling.
+- Safe runtime exception envelopes and explicit domain-error mappings retained by
+  generated middleware, with request correlation and protected internal failures.
+- Automatic per-request DI contexts and controller routing; nested request/transient
+  resolution, concurrent singleton caching, eager startup initialization, and graph validation.
+- Optional testing helpers: isolated module/provider overrides, in-process HTTP client,
+  JSON assertions, response size bounds, timeouts, and generated usage examples.
+
+### Changed
+
+- Ordinary generated application settings now load from required AppConfig.toml;
+  .env is optional and contains only secret examples. TOML types/unknown keys are
+  validated at startup, and the same snapshot configures server and logging.
+
+- Generated applications use runtime 0.1.7 and macros 0.1.6 APIs. These package
+  versions are published alongside CLI 0.1.12.
+- Provider construction errors are cached per scope; undeclared factory dependencies
+  and missing required registrations now fail explicitly.
+
+
+### Fixed
+
+- Serve a generated static landing page at both `/static` and `/static/`.
+
+## [0.1.11] - 2026-10-23
+
+### Added
+
+- A shared environment reader reused by generated server and logging configuration.
+
+- Default public static file serving with a generated example, GET/HEAD/range support, and private-path rejection.
+- JSON console/file logging using only LOG_STDOUT_ENABLED and LOG_FILE_DIR, with built-in daily rotation, retention, and shutdown flushing.
+- A composable tracing exporter layer hook for future cloud logging integrations.
+- A repository changelog and GitHub Release automation using the matching version
+  section as release notes.
+
+## [0.1.10] - 2026-10-23
+
+### Added
+
+- `GET /` welcome JSON with HTTP 200, the application name, status, and the Swagger
+  documentation path when enabled.
+- Startup logs with server, Swagger UI, and OpenAPI URLs using the actual bound
+  port, including OS-assigned ports.
+- Browser-usable loopback URLs for wildcard bindings and bracketed IPv6 addresses.
+- Tests for the welcome response, disabled Swagger, and startup URL formatting.
+
+### Changed
+
+- Disabled Swagger is explicitly logged; the welcome response does not advertise
+  a documentation link when it is disabled.
+
+### Fixed
+
+- Fresh applications no longer return `Route not found` at `/`. Other unregistered
+  paths continue to return the normal 404 error envelope.
+
+## [0.1.9] - 2026-10-23
+
+### Added
+
+- CQRS `services/<feature>_service.rs` for shared business operations. Command and
+  query handlers inject the service, which injects the repository.
+- Service provider registration and exports in generated CQRS modules.
+
+### Changed
+
+- New resources and standalone building blocks live under `src/modules/<feature>/`.
+- `src/modules/mod.rs` declares features; application registration uses
+  `crate::modules::<feature>`.
+- Resource HTTP tests live inside the feature at `tests/http.rs`; shared server
+  tests remain in `src/tests/`.
+- Rust scaffolding templates use `.rs` instead of `.tmpl`, preventing their
+  classification as Go Template. The manifest template uses `Cargo.toml.in`.
+
+## [0.1.8] - 2026-10-23
+
+### Added
+
+- `xecute update` and `xecute uninstall`, targeting the running executable's
+  Cargo installation root, including custom installation roots.
+- `xecute new .` for in-place initialization and `--name` for an explicit package name.
+- Preflight collision and symlink checks before in-place scaffold writes.
+- Cargo failure reporting and Windows helper handling for executable replacement
+  or removal after the running CLI exits.
+
+### Changed
+
+- Removed framework-comparison wording from package descriptions and documentation.
+- Generated applications use runtime `xecute 0.1.6`; macros remain `xmacros 0.1.5`.
+- Existing application files are retained during CLI management operations.
+
+## [0.1.7] - 2026-10-23
+
+### Added
+
+- `xecute run dev` with automatic debug rebuild/restart, debouncing, and recovery
+  after compiler errors.
+- `--bin`, repeatable `--watch`, and application argument forwarding after `--`.
+- Source/configuration and `.env` watching with build-output exclusions, including
+  custom Cargo target directories.
+- Managed process-tree shutdown on restarts and Ctrl-C.
+- App-level `Application::use_middleware` and controller/route `#[middleware(...)]`.
+- Ordered middleware execution, early responses, and a global `src/middleware.rs`
+  configuration hook.
+
+### Changed
+
+- Generated applications use runtime `xecute 0.1.5` and macros `xmacros 0.1.5`.
+
+## [0.1.6] - 2026-10-23
+
+### Added
+
+- MVC generation by default, explicit `--mvc`, and opt-in CQRS through `--cqrs`.
+- Persistent architecture selection in `.xecute/architecture` for later generators.
+- CQRS create-command and list-query handlers with automatic DI registration.
+
+### Changed
+
+- Request validation uses `validator` instead of `garde`, automatically rejecting
+  invalid body/query DTOs before controller business logic runs.
+- Repository metadata points to `morshedulmunna/xecute`.
+- Added a root workspace manifest and build documentation.
+- Generated applications use runtime `xecute 0.1.4` and macros `xmacros 0.1.4`.
+
+[Unreleased]: https://github.com/morshedulmunna/xecute/compare/v0.1.13...HEAD
+[0.1.11]: https://github.com/morshedulmunna/xecute/compare/v0.1.10...v0.1.11
+[0.1.10]: https://github.com/morshedulmunna/xecute/compare/v0.1.9...v0.1.10
+[0.1.9]: https://github.com/morshedulmunna/xecute/compare/v0.1.8...v0.1.9
+[0.1.8]: https://github.com/morshedulmunna/xecute/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/morshedulmunna/xecute/compare/v0.1.6...v0.1.7
+[0.1.6]: https://github.com/morshedulmunna/xecute/releases/tag/v0.1.6
+
+[0.1.12]: https://github.com/morshedulmunna/xecute/compare/v0.1.11...v0.1.12
+
+[0.1.13]: https://github.com/morshedulmunna/xecute/compare/v0.1.12...v0.1.13
+
+## Keep learning
+
+[Choose your next guide](skills/xecute/references/index.md). Return to the [learning path](skills/xecute/references/index.md) whenever you need a different topic.
+
+---
+
+# AI agent skills
+
+Documentation route: /docs/skills/ai-agent
+
+Give your AI coding agent the same documentation you use. The Xecute skill teaches
+it the project structure, MVC/CQRS conventions, request validation, module guards,
+integrations, and verification workflow.
+
+## Download the complete skill
+
+[Download the Xecute skill bundle](https://github.com/morshedulmunna/xecute/blob/main/../../../../../skills/xecute.zip)
+
+The ZIP contains one `xecute/` folder:
+
+```text
+xecute/
+├── SKILL.md                 # Entry point and application conventions
+└── references/
+    ├── topics.md             # All topics, grouped by task
+    ├── full.md              # Complete documentation in one file
+    ├── getting-started/     # Tutorials and request flow
+    ├── architecture/        # Modules, DI, scopes and lifecycle
+    ├── http/                # Controllers, validation, errors and files
+    ├── integrations/        # PostgreSQL, JWT, jobs, cache and CQRS
+    └── ...                  # CLI, configuration, tests and operations
+```
+
+All topic references are included. The agent can read the complete manual or load
+only the pages relevant to its task. The bundle is generated from the maintained
+docs, so its content stays aligned with this site.
+
+## Install for your agent
+
+1. Download and extract the ZIP.
+2. Move the `xecute` folder into your agent's skills directory. For Codex, use
+   `~/.codex/skills/xecute/` (or `$CODEX_HOME/skills/xecute/` when configured).
+3. Start a new agent session so it can discover the skill.
+4. Open your application repository and ask the agent to use the skill.
+
+Other agents can use the Markdown references directly, even if they use a
+different skill installation format. Follow that agent's own skill conventions.
+
+Example prompt:
+
+```text
+Use $xecute to add a user feature to this application.
+Read its existing architecture and the relevant Xecute references first.
+Keep controllers thin, put DTOs in dto/, and add HTTP tests for the behavior.
+```
+
+To study the whole framework:
+
+```text
+Read the Xecute skill and references/full.md.
+Explain this project's architecture, then use the relevant topic guides
+when implementing the next task. Check the installed APIs before making changes.
+```
+
+## Read without installing
+
+| Resource | Best for |
+| --- | --- |
+| [SKILL.md](https://github.com/morshedulmunna/xecute/blob/main/../../../../../skills/xecute/SKILL.md) | Inspect the agent instructions |
+| [Topic index](https://github.com/morshedulmunna/xecute/blob/main/../../../../../llms.txt) | Discover every machine-readable page |
+| [Full documentation](https://github.com/morshedulmunna/xecute/blob/main/../../../../../llms-full.txt) | Read all documentation in one request |
+| [Bundled reference index](https://github.com/morshedulmunna/xecute/blob/main/../../../../../skills/xecute/references/topics.md) | Browse the skill's included files |
+
+These URLs return plain text or Markdown and do not require JavaScript. Resolve
+them relative to the documentation site's base path when hosted in a subdirectory.
+Downloading only SKILL.md does not include its references; use the complete ZIP
+for an offline skill.
+
+## What the skill helps the agent do
+
+- Follow MVC or CQRS already selected by your application.
+- Register module definitions, providers, exports and guarded module routers.
+- Keep body/query/path inputs and DTO validation in the right layer.
+- Configure optional integrations and lifecycle cleanup explicitly.
+- Test route behavior, authorization, persistence boundaries and failures.
+
+The skill supplies guidance, not permission to publish or deploy. Your task and
+repository instructions still control what the agent should change. Match the
+reference examples to the dependency versions installed in your application.

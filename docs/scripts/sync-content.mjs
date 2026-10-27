@@ -1,3 +1,4 @@
+import { agentAssets } from './agent-assets.mjs';
 // Website pages are generated from the maintained Xecute guides.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { resolve, dirname, relative, extname } from 'node:path';
@@ -67,18 +68,21 @@ function links(text, source) {
   }).join('\n');
 }
 const expected = new Map();
+const agentPages = new Map();
 for (const page of manifest.pages) {
   const introduction = page.intro ? `${page.intro}\n\n` : '';
   const next = page.next ? `\n\n## Keep learning\n\n[${page.next.title}](${url(page.next.route)}). Return to the [learning path](/docs) whenever you need a different topic.` : '';
   const body = introduction + links(section(page), page.source).trim() + next;
+  agentPages.set(page.route, body);
   const anchor = page.heading ? `#${slug(page.heading)}` : '';
   expected.set(resolve(output, `${page.route || 'index'}.md`), `---\ntitle: ${JSON.stringify(page.title)}\ndescription: ${JSON.stringify(page.description)}\n---\n\n${body}\n\n---\n\n[Maintained source](${github}/blob/main/${page.source}${anchor}).\n`);
 }
 expected.set(resolve(output, 'meta.json'), JSON.stringify({ title: 'Xecute documentation', pages: ['index', ...manifest.categories.map((category) => category.slug)] }, null, 2) + '\n');
 for (const category of manifest.categories) expected.set(resolve(output, category.slug, 'meta.json'), JSON.stringify({ title: category.title, pages: category.pages }, null, 2) + '\n');
+for (const [file, content] of agentAssets(manifest, agentPages, read('docs/agent-skill/xecute/SKILL.md'))) expected.set(resolve(site, 'public', file), content);
 let stale = 0;
 for (const [file, content] of expected) {
-  if (check) { if (!existsSync(file) || readFileSync(file, 'utf8') !== content) { console.error(`Stale documentation: ${relative(repo, file)}`); stale++; } }
+  if (check) { if (!existsSync(file) || !readFileSync(file).equals(Buffer.from(content))) { console.error(`Stale documentation: ${relative(repo, file)}`); stale++; } }
   else { mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, content); }
 }
 function files(dir) { return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? files(resolve(dir, entry.name)) : [resolve(dir, entry.name)]); }

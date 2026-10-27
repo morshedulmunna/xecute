@@ -97,6 +97,13 @@
         "releases",
         "changelog"
       ]
+    },
+    {
+      "slug": "skills",
+      "title": "AI agent skills",
+      "pages": [
+        "ai-agent"
+      ]
     }
   ],
   "pages": [
@@ -580,6 +587,12 @@
         "route": "",
         "title": "Choose your next guide"
       }
+    },
+    {
+      "route": "skills/ai-agent",
+      "title": "AI agent skills",
+      "description": "Download the Xecute skill and complete machine-readable documentation for your coding agent.",
+      "source": "docs/handbook/ai-skills.md"
     }
   ]
 }

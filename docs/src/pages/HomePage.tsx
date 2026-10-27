@@ -53,7 +53,7 @@ export default function HomePage() {
       <div className="x-ambient" aria-hidden="true" />
       <header className="x-header">
         <Link to="/" aria-label="Xecute home"><Brand /></Link>
-        <nav aria-label="Main navigation"><Link to="/docs">Documentation</Link><Link to="/docs/testing/examples">Examples</Link><a href={GITHUB_URL} className="x-source-link"><Github size={16} /><span>GitHub</span><ArrowRight size={14} /></a></nav>
+        <nav aria-label="Main navigation"><Link to="/docs">Documentation</Link><Link to="/docs/skills/ai-agent">Skills</Link><Link to="/docs/testing/examples">Examples</Link><a href={GITHUB_URL} className="x-source-link"><Github size={16} /><span>GitHub</span><ArrowRight size={14} /></a></nav>
       </header>
 
       <main>
