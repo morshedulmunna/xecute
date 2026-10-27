@@ -46,6 +46,6 @@ lookup. `Command` and `Query` traits declare Output/Error types; event subscribe
 receive a shared `Arc<E>`. Explicit configuration and feature flags make startup
 and deployment behavior inspectable.
 
-Read [availability](/docs/getting-started/status) before using local-only features
+Read [feature setup](/docs/getting-started/status) before enabling integrations
 and the [adoption guide](/docs/getting-started/adopting-existing) when updating an
 existing generated application.

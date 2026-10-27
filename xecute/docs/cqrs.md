@@ -6,11 +6,11 @@ out to zero or more subscribers. All three share ordered pipeline behaviors,
 explicit dispatch metadata, ordinary DI module validation, and caller-owned async
 execution.
 
-These APIs currently live in the local source tree:
+Enable the feature in your application's Cargo.toml:
 
 ```toml
 [dependencies]
-xecute = { path = "../xecute", features = ["cqrs"] }
+xecute = { version = "0.1", features = ["cqrs"] }
 ```
 
 The feature does not start a worker, open a database, require a broker, or spawn

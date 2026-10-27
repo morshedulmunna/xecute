@@ -3,8 +3,6 @@ title: "Async startup and shutdown"
 description: "Initialize resources in dependency order and clean up after draining."
 ---
 
-> **Source checkout feature:** this API is implemented locally and is not in the published runtime. Enable/configure it explicitly; generators do not wire it automatically.
-
 Use lifecycle hooks when resources must connect before requests start and close after work drains. Follow the async startup path below; attribute markers alone do not execute hooks.
 
 Register asynchronous resources with `ProviderDefinition::singleton_async`, then

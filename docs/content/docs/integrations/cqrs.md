@@ -3,8 +3,6 @@ title: "CQRS buses and events"
 description: "Register typed command/query handlers, event subscribers and shared pipelines."
 ---
 
-> **Source checkout feature:** this API is implemented locally and is not in the published runtime. Enable/configure it explicitly; generators do not wire it automatically.
-
 Use typed buses when you want central command/query dispatch or event subscribers. Generated CQRS already works through direct handler injection; adding buses is a separate application choice.
 
 Xecute's optional `cqrs` runtime feature provides typed `CommandBus`, `QueryBus`,
@@ -13,11 +11,11 @@ out to zero or more subscribers. All three share ordered pipeline behaviors,
 explicit dispatch metadata, ordinary DI module validation, and caller-owned async
 execution.
 
-These APIs currently live in the local source tree:
+Enable the feature in your application's Cargo.toml:
 
 ```toml
 [dependencies]
-xecute = { path = "../xecute", features = ["cqrs"] }
+xecute = { version = "0.1", features = ["cqrs"] }
 ```
 
 The feature does not start a worker, open a database, require a broker, or spawn

@@ -1,8 +1,8 @@
 # Runnable examples
 
 Run these commands from the repository root. Each example is implemented under
-`xecute/examples`; the associated tests compile its application setup. Current
-source features require the local runtime rather than crates.io runtime 0.1.9.
+`xecute/examples`; the associated tests compile its application setup. Clone the repository to run
+these examples; applications can enable the same APIs through their Cargo features.
 
 | Example | Command | Requirements |
 | --- | --- | --- |

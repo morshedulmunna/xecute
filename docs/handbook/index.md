@@ -35,12 +35,13 @@ without adding a message bus or a second database.
 | Fix a setup or startup problem | [Troubleshooting](/docs/operations/troubleshooting) |
 | Update an existing generated application | [Adoption guide](/docs/getting-started/adopting-existing) |
 
-## Know what you are running
+## Add capabilities when you need them
 
-The published CLI and this repository’s source checkout have different available
-features. Pages marked **Source checkout feature** need a local runtime dependency
-and explicit setup. Installing a published CLI does not enable unpublished APIs.
-Read [feature availability](/docs/getting-started/status) before adding integrations.
+Lifecycle management is part of the runtime. Database, JWT authentication, jobs,
+caching, and CQRS buses are enabled through Cargo features and explicit provider
+configuration. Start with the generated API, then follow the integration guide for
+each capability. The [feature setup guide](/docs/getting-started/status) explains
+what is generated and what you configure yourself.
 
 A generated resource starts with collection GET and create POST, validation, and
 an **in-memory** repository. It does not create login, database persistence,

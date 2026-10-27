@@ -3,8 +3,6 @@ title: "PostgreSQL"
 description: "Configure lifecycle-managed pools, migrations, repositories and transactions."
 ---
 
-> **Source checkout feature:** this API is implemented locally and is not in the published runtime. Enable/configure it explicitly; generators do not wire it automatically.
-
 Replace in-memory storage when records must survive a restart. You need a PostgreSQL server, a connection URL, and the postgres feature; follow configuration, provider registration, then repository examples.
 
 Xecute's optional `postgres` feature integrates SQLx 0.9 with dependency injection
@@ -12,12 +10,11 @@ and async application lifecycle. It provides a shared connection pool, validated
 configuration, startup migrations, readiness checks, and graceful pool cleanup.
 Repositories use native SQLx queries and transactions; Xecute does not add an ORM.
 
-This feature is currently in the local source tree. For development against this
-checkout, add the runtime with its actual relative path:
+Enable the runtime's `postgres` feature:
 
 ```toml
 [dependencies]
-xecute = { path = "../xecute", features = ["postgres"] }
+xecute = { version = "0.1", features = ["postgres"] }
 ```
 
 `postgres` is disabled by default. You do not need SQLx as a separate dependency:

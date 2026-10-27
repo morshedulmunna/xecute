@@ -5,11 +5,10 @@ receipts, retries, per-attempt deadlines, graceful draining, and interval schedu
 
 ```toml
 [dependencies]
-xecute = { path = "../xecute", features = ["jobs"] }
+xecute = { version = "0.1", features = ["jobs"] }
 ```
 
-This feature is currently in the local source tree. It does not require a broker
-or database. **Accepted jobs are not persisted:** a process crash/restart loses
+This feature does not require a broker or database. **Accepted jobs are not persisted:** a process crash/restart loses
 queued and running work. Use a durable broker or a database outbox/worker system
 for work that must survive a crash. This implementation is suitable for bounded
 best-effort application work; it does not claim exactly-once delivery, distributed

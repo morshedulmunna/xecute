@@ -117,7 +117,7 @@ for request assertions and provider overrides.
 | Add an application operation | `service.rs` |
 | Change how data is saved | `repository/store.rs` |
 | Use a provider from another feature | `module.rs` imports and the owning module’s exports |
-| Protect a route | [Guards and JWT](/docs/integrations/auth), checking availability first |
+| Protect a route | [Guards and JWT](/docs/integrations/auth), following its feature setup |
 
 ## Using CQRS instead?
 

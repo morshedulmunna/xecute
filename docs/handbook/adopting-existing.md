@@ -4,26 +4,25 @@ Enable and integrate one capability at a time, keeping the application compiling
 and its existing HTTP tests passing. Installing a newer CLI does not rewrite app
 files; this guide covers the explicit migration work.
 
-## 1. Select the local runtime
+## 1. Enable the runtime features
 
-The five new capabilities are not published yet. In a standalone app, merge the
-local path and required flags into the existing dependency:
+In a standalone app, merge the required flags into the existing runtime dependency:
 
 ```toml
 [dependencies]
-xecute = { path = "/absolute/path/to/xecute-cli/xecute", features = ["auth", "postgres", "jobs", "cache-redis", "cqrs"] }
+xecute = { version = "0.1", features = ["auth", "postgres", "jobs", "cache-redis", "cqrs"] }
 ```
 
 Choose only the flags you use. For memory caching select `cache` rather than
 `cache-redis`. Async lifecycle needs no extra feature. Keep the app's test-only
 `testing` feature in dev-dependencies where appropriate.
 
-For a generated workspace, update the shared source once:
+For a generated workspace, update the shared dependency once:
 
 ```toml
 # Workspace Cargo.toml
 [workspace.dependencies]
-xecute = { path = "/absolute/path/to/xecute-cli/xecute" }
+xecute = { version = "0.1" }
 
 # apps/my-api/Cargo.toml
 [dependencies]
@@ -110,8 +109,6 @@ infrastructure for work that must survive a process crash.
 ## Verify before deployment
 
 Run the app's existing tests, add tests for each enabled capability, and check
-formatting/Clippy. Verify generated-app tests against the local runtime, not only
+formatting/Clippy. Verify generated-app tests against your selected runtime version, not only
 the library's unit tests. The [example catalog](/docs/testing/examples) provides
-working commands and external-service requirements. After a future published
-release, switch the source dependency to its documented version only when that
-release contains the required APIs.
+working commands and external-service requirements.

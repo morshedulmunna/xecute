@@ -126,8 +126,8 @@
     },
     {
       "route": "getting-started/status",
-      "title": "Published and source features",
-      "description": "Understand the current release, local features and generator defaults.",
+      "title": "Features and setup",
+      "description": "Choose runtime features and understand what the generator configures for you.",
       "source": "docs/handbook/status.md"
     },
     {
@@ -257,7 +257,6 @@
       "source": "xecute/README.md",
       "heading": "Async providers and application lifecycle",
       "level": 3,
-      "unreleased": true,
       "intro": "Use lifecycle hooks when resources must connect before requests start and close after work drains. Follow the async startup path below; attribute markers alone do not execute hooks.",
       "next": {
         "route": "",
@@ -425,7 +424,6 @@
       "title": "PostgreSQL",
       "description": "Configure lifecycle-managed pools, migrations, repositories and transactions.",
       "source": "xecute/docs/postgres.md",
-      "unreleased": true,
       "intro": "Replace in-memory storage when records must survive a restart. You need a PostgreSQL server, a connection URL, and the postgres feature; follow configuration, provider registration, then repository examples.",
       "next": {
         "route": "integrations/auth",
@@ -437,7 +435,6 @@
       "title": "Guards and JWT authentication",
       "description": "Protect routes with verified users and role/permission policies.",
       "source": "xecute/docs/auth.md",
-      "unreleased": true,
       "intro": "Protect selected routes using verified identities. Configure a trusted token verifier before adding role or permission checks; reading an Authorization header is not authentication.",
       "next": {
         "route": "integrations/jobs",
@@ -449,7 +446,6 @@
       "title": "Jobs and scheduling",
       "description": "Run bounded process-local workers with retries, receipts and interval schedules.",
       "source": "xecute/docs/jobs.md",
-      "unreleased": true,
       "intro": "Move suitable work out of a request handler into bounded workers. These jobs run in the current process and are not durable across restart; choose that model before configuring retries.",
       "next": {
         "route": "integrations/cache",
@@ -461,7 +457,6 @@
       "title": "Memory and Redis caching",
       "description": "Use explicit TTL caching with bounded memory or namespaced Redis.",
       "source": "xecute/docs/cache.md",
-      "unreleased": true,
       "intro": "Cache data that can be recomputed, with an explicit key and expiration. Start with memory caching; use Redis only when you need that backend and have a Redis service available.",
       "next": {
         "route": "integrations/cqrs",
@@ -473,7 +468,6 @@
       "title": "CQRS buses and events",
       "description": "Register typed command/query handlers, event subscribers and shared pipelines.",
       "source": "xecute/docs/cqrs.md",
-      "unreleased": true,
       "intro": "Use typed buses when you want central command/query dispatch or event subscribers. Generated CQRS already works through direct handler injection; adding buses is a separate application choice.",
       "next": {
         "route": "",
@@ -561,7 +555,7 @@
     {
       "route": "reference/features",
       "title": "Cargo feature reference",
-      "description": "Enable only the runtime capabilities an application needs.",
+      "description": "Choose the Cargo flags and setup required for each runtime capability.",
       "source": "docs/handbook/features.md"
     },
     {
@@ -579,9 +573,9 @@
     {
       "route": "reference/changelog",
       "title": "Changelog",
-      "description": "Review published CLI history and unreleased source changes.",
+      "description": "Review changes across Xecute releases.",
       "source": "CHANGELOG.md",
-      "intro": "Check which release introduced a change. Unreleased entries describe source work and do not mean the feature is available in a published package.",
+      "intro": "Review changes before updating an existing application. Updating the CLI does not rewrite generated application files.",
       "next": {
         "route": "",
         "title": "Choose your next guide"

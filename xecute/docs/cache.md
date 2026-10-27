@@ -5,11 +5,11 @@ exact-key invalidation, and lifecycle cleanup. Choose bounded process-local memo
 or an optional namespaced Redis backend. Caching is opt-in; no controller response
 or authenticated data is cached automatically.
 
-These APIs currently live in the local source tree:
+Enable the feature in your application's Cargo.toml:
 
 ```toml
 [dependencies]
-xecute = { path = "../xecute", features = ["cache"] }
+xecute = { version = "0.1", features = ["cache"] }
 # Use features = ["cache-redis"] for Redis; this also enables cache.
 ```
 

@@ -5,12 +5,11 @@ scope. Guards run before request DTO extraction and handler execution. Optional
 JWT authentication installs a verified principal; role and permission policies
 then authorize that principal.
 
-This implementation is currently available in the local source tree. For an
-application using this checkout, enable the runtime's `auth` feature:
+Enable the runtime's `auth` feature in your application:
 
 ```toml
 [dependencies]
-xecute = { path = "../xecute", features = ["auth"] }
+xecute = { version = "0.1", features = ["auth"] }
 ```
 
 Custom guards require no feature flag. JWT verification, `AuthenticatedUser`,

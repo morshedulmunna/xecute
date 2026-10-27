@@ -1,8 +1,8 @@
 # Xecute documentation
 
 Documentation website for this repository: Vite, React Router, Fumadocs and
-Tailwind. Content describes the actual CLI/runtime/macros and distinguishes
-published behavior from source-only opt-in features. Nothing is published by
+Tailwind. Content describes the CLI/runtime/macros and the setup required for optional
+runtime features. Nothing is published by
 building or previewing this site.
 
 ## Run and verify
@@ -78,11 +78,11 @@ imply that an endpoint or integration already exists. End with a concrete next s
 Reference pages can set `intro` and `next` in `content-manifest.json` to give readers
 context and a follow-up guide without duplicating their maintained API reference.
 The first learning path is quick start → first feature → request flow → controllers
-→ modules. Keep published commands distinct from unpublished source behavior.
+→ modules. Keep generated defaults distinct from explicitly configured integrations.
 
 Use real `xecute` APIs and exact CLI flags from this checkout. State required Cargo
-features, external services, provider registration and lifecycle setup. Separate
-implemented source behavior from published packages and generated defaults.
+features, external services, provider registration and lifecycle setup. Distinguish
+generated defaults from explicitly configured application behavior.
 Distinguish fragments from runnable programs, and link to the complete tested
 example when a full application is needed. Include meaningful failure behavior
 and material limits, such as in-process job/event delivery or explicit auth setup.

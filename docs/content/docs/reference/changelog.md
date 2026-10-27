@@ -1,9 +1,9 @@
 ---
 title: "Changelog"
-description: "Review published CLI history and unreleased source changes."
+description: "Review changes across Xecute releases."
 ---
 
-Check which release introduced a change. Unreleased entries describe source work and do not mean the feature is available in a published package.
+Review changes before updating an existing application. Updating the CLI does not rewrite generated application files.
 
 Changes are grouped by published CLI version, newest first. Runtime and macro
 versions are listed when they changed alongside a CLI release. Updating the CLI

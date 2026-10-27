@@ -3,8 +3,6 @@ title: "Memory and Redis caching"
 description: "Use explicit TTL caching with bounded memory or namespaced Redis."
 ---
 
-> **Source checkout feature:** this API is implemented locally and is not in the published runtime. Enable/configure it explicitly; generators do not wire it automatically.
-
 Cache data that can be recomputed, with an explicit key and expiration. Start with memory caching; use Redis only when you need that backend and have a Redis service available.
 
 Xecute exposes an explicit `Cache` API for JSON values or bytes, positive TTLs,
@@ -12,11 +10,11 @@ exact-key invalidation, and lifecycle cleanup. Choose bounded process-local memo
 or an optional namespaced Redis backend. Caching is opt-in; no controller response
 or authenticated data is cached automatically.
 
-These APIs currently live in the local source tree:
+Enable the feature in your application's Cargo.toml:
 
 ```toml
 [dependencies]
-xecute = { path = "../xecute", features = ["cache"] }
+xecute = { version = "0.1", features = ["cache"] }
 # Use features = ["cache-redis"] for Redis; this also enables cache.
 ```
 

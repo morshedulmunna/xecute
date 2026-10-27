@@ -68,12 +68,11 @@ function links(text, source) {
 }
 const expected = new Map();
 for (const page of manifest.pages) {
-  const badge = page.unreleased ? '> **Source checkout feature:** this API is implemented locally and is not in the published runtime. Enable/configure it explicitly; generators do not wire it automatically.\n\n' : '';
   const introduction = page.intro ? `${page.intro}\n\n` : '';
   const next = page.next ? `\n\n## Keep learning\n\n[${page.next.title}](${url(page.next.route)}). Return to the [learning path](/docs) whenever you need a different topic.` : '';
   const body = introduction + links(section(page), page.source).trim() + next;
   const anchor = page.heading ? `#${slug(page.heading)}` : '';
-  expected.set(resolve(output, `${page.route || 'index'}.md`), `---\ntitle: ${JSON.stringify(page.title)}\ndescription: ${JSON.stringify(page.description)}\n---\n\n${badge}${body}\n\n---\n\n[Maintained source](${github}/blob/main/${page.source}${anchor}).\n`);
+  expected.set(resolve(output, `${page.route || 'index'}.md`), `---\ntitle: ${JSON.stringify(page.title)}\ndescription: ${JSON.stringify(page.description)}\n---\n\n${body}\n\n---\n\n[Maintained source](${github}/blob/main/${page.source}${anchor}).\n`);
 }
 expected.set(resolve(output, 'meta.json'), JSON.stringify({ title: 'Xecute documentation', pages: ['index', ...manifest.categories.map((category) => category.slug)] }, null, 2) + '\n');
 for (const category of manifest.categories) expected.set(resolve(output, category.slug, 'meta.json'), JSON.stringify({ title: category.title, pages: category.pages }, null, 2) + '\n');

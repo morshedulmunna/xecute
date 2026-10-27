@@ -3,8 +3,6 @@ title: "Jobs and scheduling"
 description: "Run bounded process-local workers with retries, receipts and interval schedules."
 ---
 
-> **Source checkout feature:** this API is implemented locally and is not in the published runtime. Enable/configure it explicitly; generators do not wire it automatically.
-
 Move suitable work out of a request handler into bounded workers. These jobs run in the current process and are not durable across restart; choose that model before configuring retries.
 
 Enable Xecute's `jobs` feature for bounded, process-local Tokio workers with
@@ -12,11 +10,10 @@ receipts, retries, per-attempt deadlines, graceful draining, and interval schedu
 
 ```toml
 [dependencies]
-xecute = { path = "../xecute", features = ["jobs"] }
+xecute = { version = "0.1", features = ["jobs"] }
 ```
 
-This feature is currently in the local source tree. It does not require a broker
-or database. **Accepted jobs are not persisted:** a process crash/restart loses
+This feature does not require a broker or database. **Accepted jobs are not persisted:** a process crash/restart loses
 queued and running work. Use a durable broker or a database outbox/worker system
 for work that must survive a crash. This implementation is suitable for bounded
 best-effort application work; it does not claim exactly-once delivery, distributed

@@ -43,12 +43,7 @@ This creates an MVC application and an `example` feature. MVC means your HTTP
 controller calls a service, and the service calls a repository. You do not need
 to wire the generated example yourself.
 
-> **Published CLI or local source?** The command above installs the published
-> CLI. Unpublished generator changes, including fresh dependency resolution at
-> setup, require installing the CLI from this checkout. See
-> [feature availability](/docs/getting-started/status) for the distinction.
-
-The current source generator resolves a fresh `Cargo.lock` using the latest
+The generator resolves a fresh `Cargo.lock` using the latest
 compatible dependencies. Keep that file in Git. A network failure leaves the
 project files available; enter the project and retry `cargo generate-lockfile`.
 Breaking dependency versions are not automatically adopted.

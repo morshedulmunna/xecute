@@ -5,12 +5,11 @@ and async application lifecycle. It provides a shared connection pool, validated
 configuration, startup migrations, readiness checks, and graceful pool cleanup.
 Repositories use native SQLx queries and transactions; Xecute does not add an ORM.
 
-This feature is currently in the local source tree. For development against this
-checkout, add the runtime with its actual relative path:
+Enable the runtime's `postgres` feature:
 
 ```toml
 [dependencies]
-xecute = { path = "../xecute", features = ["postgres"] }
+xecute = { version = "0.1", features = ["postgres"] }
 ```
 
 `postgres` is disabled by default. You do not need SQLx as a separate dependency:

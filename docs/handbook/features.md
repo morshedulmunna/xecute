@@ -16,20 +16,17 @@ configuration, error envelopes and versioning are part of the base runtime.
 | `upload` | Streaming multipart and private local storage | Upload policy/storage and HTTP body limits |
 | `upload-s3` | S3 storage adapter; includes `upload` | Bucket/region and trusted AWS configuration |
 
-## Source versus published runtime
+## Enable features in your application
 
-The auth, postgres, jobs, cache, cache-redis and cqrs features are currently local
-source additions. Async lifecycle is also a local addition without a feature flag.
-The manifest version alone does not identify these unreleased changes. Read
-[release status](/docs/getting-started/status) and use a local dependency when
-trying them.
+Add the flags you need to the runtime dependency. Keep the same dependency version
+in normal and dev dependencies; enable `testing` for test helpers.
 
 ```toml
 [dependencies]
-xecute = { path = "/path/to/repo/xecute", features = ["auth", "cqrs"] }
+xecute = { version = "0.1", features = ["auth", "cqrs"] }
 
 [dev-dependencies]
-xecute = { path = "/path/to/repo/xecute", features = ["testing"] }
+xecute = { version = "0.1", features = ["testing"] }
 ```
 
 Cargo unifies feature selections for the same dependency source. Keep runtime and
