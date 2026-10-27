@@ -35,3 +35,50 @@ jobs:
             cargo clippy --manifest-path "$project/Cargo.toml" --all-targets --all-features --locked -- -D warnings
             cargo test --manifest-path "$project/Cargo.toml" --all-features --locked
           done
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: xecute
+          POSTGRES_PASSWORD: xecute_ci_only
+          POSTGRES_DB: xecute_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U xecute -d xecute_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://xecute:xecute_ci_only@127.0.0.1:5432/xecute_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.98.1
+      - run: cargo test -p xecute --features postgres,testing --test postgres --locked
+      - run: cargo test -p xecute --features postgres,testing --test postgres --locked -- --ignored
+
+  redis:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:8
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_REDIS_URL: redis://127.0.0.1:6379/
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.98.1
+      - run: cargo test -p xecute --features jobs,cache-redis,testing --test jobs --test cache --test cache_redis --example jobs_cache --locked -- --include-ignored

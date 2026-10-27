@@ -1,0 +1,10 @@
+{
+  "title": "Opt-in runtime features",
+  "pages": [
+    "postgres",
+    "auth",
+    "jobs",
+    "cache",
+    "cqrs"
+  ]
+}

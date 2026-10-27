@@ -658,3 +658,27 @@ Build an app container using the workspace root as its build context:
 ```sh
 docker build -f apps/admin/Dockerfile -t admin .
 ```
+
+
+## Optional CQRS bus adoption
+
+The runtime's local `cqrs` feature adds typed command/query buses, event fan-out
+and shared execution pipelines. Generated CQRS resources keep their direct-handler
+flow by default; existing applications are not rewritten. To opt in, implement
+message/handler traits, explicitly register the configured buses, then inject them
+into controllers. See the source repository's `xecute/docs/cqrs.md` and
+`xecute/examples/cqrs/` for the complete adoption guide and HTTP example. Prior
+published runtimes do not include this feature; use the matching local runtime
+until it is released.
+
+## Dependency freshness during setup
+
+`xecute new` resolves a fresh `Cargo.lock` using `cargo generate-lockfile`, for
+both MVC/CQRS and registry/local-runtime projects. Cargo selects the newest stable
+versions allowed by the template’s SemVer ranges and dependency graph; breaking
+major versions are not automatically adopted. Commit the resulting lockfile.
+Setup needs registry access unless Cargo is configured for offline cached resolution.
+On resolution failure, setup returns an error but keeps the generated files; fix
+registry/network access and run `cargo generate-lockfile` inside the project.
+New workspaces resolve their initial graph; adding an app to an existing workspace
+preserves its shared versions and lockfile through Cargo metadata resolution.

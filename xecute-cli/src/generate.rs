@@ -388,9 +388,7 @@ fn scaffold(
             "src/modules/example",
             "src/modules/mod.rs",
         ]);
-        if runtime.is_none() {
-            outputs.push("Cargo.lock");
-        }
+        outputs.push("Cargo.lock");
         // Validate every destination before writing anything. Symlinked parents
         // are rejected so initialization cannot write outside the chosen root.
         for output in outputs {
@@ -467,12 +465,6 @@ fn scaffold(
             .replace("__PROJECT_NAME__", name)
             .replace("__ARCHITECTURE__", architecture.name()),
     )?;
-    if runtime.is_none() && !member {
-        write(
-            &root.join("Cargo.lock"),
-            &include_str!("../templates/project.lock").replace("__PROJECT_NAME__", name),
-        )?;
-    }
     formatted.push("src/app_module.rs".into());
     format_files(&root, &formatted)?;
     component_inner(&root, "resource", "example", !member)?;
@@ -480,6 +472,7 @@ fn scaffold(
         println!("Created {name} ({})", architecture.name());
         return Ok(());
     }
+    resolve_project_dependencies(&root)?;
     let cd = if in_place {
         String::new()
     } else {
@@ -489,6 +482,26 @@ fn scaffold(
         "Created {name} ({})\n{cd}  xecute run dev\n  Swagger: http://127.0.0.1:3000/docs/",
         architecture.name()
     );
+    Ok(())
+}
+
+/// Resolve from the registry at setup time rather than shipping an aging lockfile.
+fn resolve_project_dependencies(root: &Path) -> Result<()> {
+    println!("Resolving latest compatible dependencies...");
+    let status = Command::new("cargo")
+        .arg("generate-lockfile")
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!(
+            "project files created, but dependency resolution could not start: {error}; run cargo generate-lockfile in {}",
+            root.display()
+        ))?;
+    if !status.success() {
+        return Err(format!(
+            "project files created, but dependency resolution failed; check registry/network access and run cargo generate-lockfile in {}",
+            root.display()
+        ));
+    }
     Ok(())
 }
 

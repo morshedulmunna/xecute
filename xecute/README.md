@@ -395,3 +395,147 @@ query strings (`#[query]`), headers (`HeaderMap`), URL-encoded forms (`Form<T>`)
 raw text (`String`), and binary data (`Bytes`). Its comments also explain middleware
 extensions, connection info, and the separate file upload example. Use one
 body-consuming extractor per handler, placed last.
+
+### Async providers and application lifecycle
+
+Register asynchronous resources with `ProviderDefinition::singleton_async`, then
+await `container.initialize_async()` before binding or serving HTTP. Factories
+receive an owned `Container`, so they can await connection setup and resolve
+**declared** dependencies after await points. Dependencies and their startup hooks
+finish before dependent factories run. Existing synchronous factories and derived
+providers can depend on these initialized resources without changing their APIs.
+
+```rust
+use xecute::{Container, InjectError, ProviderDefinition};
+
+struct Connection;
+impl Connection {
+    async fn connect() -> Result<Self, InjectError> { Ok(Self) }
+    async fn close(&self) -> Result<(), InjectError> { Ok(()) }
+}
+
+# async fn example() -> Result<(), InjectError> {
+let container = Container::builder()
+    .provider(
+        ProviderDefinition::singleton_async::<Connection, _, _>(vec![], |_| async {
+            Connection::connect().await
+        })
+        .on_init::<Connection, _, _>(|connection| async move {
+            // Optional readiness checks or resource warm-up.
+            let _ = connection;
+            Ok(())
+        })
+        .on_shutdown::<Connection, _, _>(|connection| async move {
+            connection.close().await
+        }),
+    )
+    .build()?;
+
+container.initialize_async().await?;
+let connection = container.resolve::<Connection>()?;
+// Serve requests, then stop accepting work and drain outstanding requests.
+container.shutdown_async().await?;
+# let _ = connection;
+# Ok(())
+# }
+```
+
+Use `.on_init::<YourType, _, _>(...)` and `.on_shutdown::<YourType, _, _>(...)`
+on a synchronous provider definition as well, including `YourType::definition()`.
+The hook type must match the registered provider type. Hooks are singleton-only;
+request and transient factories keep their existing resolution behavior. Sync
+`initialize()` reports `AsyncInitializationRequired` when async factories or
+hooks need startup. It remains usable after async startup completes.
+
+Clones share lifecycle state. Concurrent initialization runs factories and hooks
+once; shutdown runs cleanup in reverse dependency order. Startup failures clean
+up already constructed resources, including a resource whose init hook failed,
+then return and cache the original startup error. Cleanup continues if a hook
+returns an error; explicit shutdown returns the first cleanup error. A factory
+that fails before returning owns cleanup of its partially constructed resources.
+
+Shutdown is explicit: dropping a container does not execute async hooks. After
+startup cancellation, call `shutdown_async()` to clean constructed resources;
+startup cannot be retried on that container. Cancelled shutdown can be resumed,
+but the interrupted hook is not retried. Keep cleanup hooks bounded and avoid
+cancelling them when possible. Hooks and factories must not call lifecycle
+methods recursively on the same container. Existing `Arc` references remain
+accessible after cleanup; finish application work before shutting down.
+
+For module-based applications, attach definitions with
+`ModuleDefinition::provider(...)`, then build with `ModuleGraph` as usual.
+For generated applications using async resources, build the container from
+`AppModule::definitions()` and await initialization before calling
+`AppModule::router_with_container(container.clone())`; the synchronous
+`AppModule::container()` helper cannot initialize async resources. Retain a
+container clone for cleanup after graceful request draining, including startup
+errors after initialization (for example, a failed listener bind).
+
+With the `testing` feature, use `TestingModule::compile_async().await` and call
+`shutdown_async()` when the test finishes. Provider overrides replace factories
+and hooks together. Existing lifecycle attribute markers such as
+`#[on_module_init]` remain placeholders; use the executable registration methods
+above.
+
+Run `cargo run -p xecute --example async_lifecycle` for a complete example with
+async connection setup, a synchronous dependent service, and explicit cleanup.
+
+
+### PostgreSQL pools, migrations, and transactions
+
+Enable the optional `postgres` feature to use `database::PostgresConfig` and
+`database::PostgresDatabase`. Register a pool with `provider_with_migrations`,
+await `initialize_async()` before serving, and await `shutdown_async()` after
+request draining. Repositories use the re-exported `database::sqlx` APIs and
+native transactions. Database support is opt-in; resource generators continue
+to produce their in-memory examples.
+
+See the [PostgreSQL guide](docs/postgres.md) for local setup, pool/TLS settings,
+module registration, generated-app integration, migration deployment,
+repository/transaction examples, error handling, and live-test commands.
+Run `cargo run -p xecute --example postgres --features postgres` with
+`DATABASE_URL` set to a development PostgreSQL instance for the complete example.
+
+
+### Guards, JWT authentication, and permissions
+
+Executable `#[guard(...)]` annotations protect controllers and routed handlers;
+`Application::use_guard` protects an application router. Custom guards work
+without extra features. Enable `auth` for pinned HS256/RS256 JWT verification,
+`AuthenticatedUser`, `#[roles(...)]`, and `#[permissions(...)]`. Authentication
+installs a verified principal before DTO extraction and authorization checks.
+
+See the [authentication and guard guide](docs/auth.md) for configuration, DI,
+public routes, execution order, safe errors, limitations, and test commands.
+Run `cargo run -p xecute --example auth --features auth` with a random `JWT_SECRET`
+of at least 32 bytes to try the local example.
+
+
+### Background jobs and TTL caching
+
+Enable `jobs` for bounded in-process queues with retries, per-attempt timeouts,
+receipts, interval schedules and lifecycle draining. Enable `cache` for bounded
+memory TTL/LRU storage, or `cache-redis` for shared namespaced Redis entries.
+Jobs are process-local and do not survive a restart; Redis is a cache backend,
+not a durable job broker in this implementation.
+
+See the [jobs guide](docs/jobs.md) and [cache guide](docs/cache.md) for limits,
+DI/resource ordering, retry/idempotency semantics, Redis configuration,
+authorization-aware cache keys, invalidation and test commands.
+Run `cargo run -p xecute --example jobs_cache --features jobs,cache` for a complete
+worker → cache example with a retry and explicit lifecycle cleanup.
+
+
+### CQRS command/query buses, event handlers, and pipelines
+
+Enable `cqrs` for typed `CommandBus` / `QueryBus` dispatch and ordered `EventBus`
+fan-out. Builders reject duplicate registrations, bind DI handlers with ordinary
+scope/module validation, and support shared `Behavior` pipelines and explicit
+`DispatchContext` metadata. Domain errors remain typed; event publication reports
+subscriber failures instead of silently dropping them. Buses are in-process and
+caller-owned, with no durable broker or automatic event sourcing.
+
+See the [CQRS guide](docs/cqrs.md) for API examples, error/transaction/cancellation
+semantics, request scopes, workflow limitations and migration from generated direct
+handlers. Run `cargo run -p xecute --example cqrs --features cqrs` for a complete
+HTTP example with separate DTOs, commands, queries, repository and event subscribers.

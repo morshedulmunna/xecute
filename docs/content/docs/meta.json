@@ -1,0 +1,15 @@
+{
+  "title": "Xecute documentation",
+  "pages": [
+    "index",
+    "getting-started",
+    "cli",
+    "architecture",
+    "http",
+    "configuration",
+    "integrations",
+    "testing",
+    "operations",
+    "reference"
+  ]
+}

@@ -18,6 +18,13 @@ pub use xmacros::*;
 pub mod middleware;
 pub use middleware::Application;
 
+/// Executable application, controller, and route guards.
+pub mod guards;
+
+/// JWT bearer authentication, verified principals, and role/permission policies.
+#[cfg(feature = "auth")]
+pub mod auth;
+
 /// Streaming multipart uploads with private local and optional S3 storage.
 #[cfg(feature = "upload")]
 pub mod upload;
@@ -26,8 +33,26 @@ pub mod upload;
 #[cfg(feature = "testing")]
 pub mod testing;
 
+/// Typed command/query dispatch, event fan-out, and shared CQRS pipelines.
+#[cfg(feature = "cqrs")]
+pub mod cqrs;
+
+/// Bounded process-local background jobs and interval scheduling.
+#[cfg(feature = "jobs")]
+pub mod jobs;
+
+/// Explicit TTL caching with memory and optional Redis backends.
+#[cfg(feature = "cache")]
+pub mod cache;
+
+/// Optional SQLx PostgreSQL pools, migrations, and lifecycle integration.
+#[cfg(feature = "postgres")]
+pub mod database;
+
 /// Typed configuration readers and redacted validation errors.
 pub mod config;
+
+mod lifecycle;
 
 mod scoped;
 pub use scoped::{Inject, with_container};
@@ -146,6 +171,12 @@ pub enum InjectError {
     ConstructionFailed(&'static str),
     /// A synchronization lock was poisoned by a panic.
     Poisoned,
+    /// Async construction or lifecycle hooks require initialize_async before serving.
+    AsyncInitializationRequired(&'static str),
+    /// Lifecycle hooks are supported only on singleton providers.
+    InvalidLifecycleScope(&'static str),
+    /// Initialization or shutdown was cancelled, or the container has stopped.
+    LifecycleStopped,
 }
 impl fmt::Display for InjectError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -176,6 +207,13 @@ impl fmt::Display for InjectError {
             ),
             Self::Downcast(n) => write!(f, "provider {n} returned an incompatible value"),
             Self::ConstructionFailed(reason) => write!(f, "provider construction failed: {reason}"),
+            Self::AsyncInitializationRequired(n) => {
+                write!(f, "provider {n} requires initialize_async")
+            }
+            Self::InvalidLifecycleScope(n) => {
+                write!(f, "lifecycle hooks require singleton scope: {n}")
+            }
+            Self::LifecycleStopped => write!(f, "container lifecycle stopped or interrupted"),
             Self::Poisoned => write!(f, "container lock was poisoned"),
         }
     }
@@ -189,6 +227,9 @@ pub struct ProviderDefinition {
     dependencies: Vec<ProviderKey>,
     optional_dependencies: Vec<ProviderKey>,
     factory: Arc<Factory>,
+    async_factory: Option<Arc<lifecycle::AsyncFactory>>,
+    init_hook: Option<Arc<lifecycle::Hook>>,
+    shutdown_hook: Option<Arc<lifecycle::Hook>>,
 }
 impl fmt::Debug for ProviderDefinition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -213,6 +254,9 @@ impl ProviderDefinition {
             dependencies,
             optional_dependencies: Vec::new(),
             factory: Arc::new(move |c| factory(c).map(|v| Arc::new(v) as Arc<DynValue>)),
+            async_factory: None,
+            init_hook: None,
+            shutdown_hook: None,
         }
     }
     #[must_use]
@@ -252,6 +296,9 @@ impl ProviderDefinition {
             dependencies: Vec::new(),
             optional_dependencies: Vec::new(),
             factory: Arc::new(move |_| Ok(value.clone())),
+            async_factory: None,
+            init_hook: None,
+            shutdown_hook: None,
         }
     }
     #[must_use]
@@ -313,6 +360,8 @@ pub struct Container {
     providers: Arc<HashMap<ProviderKey, ProviderDefinition>>,
     singletons: Arc<Cache>,
     request_values: Option<Arc<Cache>>,
+    lifecycle: Arc<lifecycle::Lifecycle>,
+    async_owner: Option<ProviderKey>,
 }
 
 thread_local! {
@@ -352,9 +401,21 @@ impl Container {
             .providers
             .get(&key)
             .ok_or(InjectError::Missing(key.name))?;
+        // Fail before entering a synchronous OnceLock factory, so an early resolve
+        // cannot permanently cache AsyncInitializationRequired in its dependents.
+        self.ensure_async_dependencies(key, &mut HashSet::new())?;
         let identity = Arc::as_ptr(&self.providers) as usize;
         RESOLVING.with(|path| {
             let mut path = path.borrow_mut();
+            if !path.iter().any(|(id, _)| *id == identity)
+                && let Some(owner) = self.async_owner
+                && !self.providers[&owner].dependencies.contains(&key)
+            {
+                return Err(InjectError::UndeclaredDependency {
+                    owner: owner.name,
+                    dependency: key.name,
+                });
+            }
             if let Some(index) = path.iter().position(|entry| *entry == (identity, key)) {
                 let mut chain = path[index..]
                     .iter()
@@ -393,6 +454,12 @@ impl Container {
             .clone();
         // Successful instances and construction errors are deterministic within the scope.
         // OnceLock serializes concurrent initialization without holding the cache lock.
+        if definition.async_factory.is_some() {
+            return slot
+                .get()
+                .cloned()
+                .unwrap_or(Err(InjectError::AsyncInitializationRequired(key.name)));
+        }
         slot.get_or_init(|| {
             if definition.scope == Scope::Singleton {
                 // Singletons must never retain the first HTTP request's resolution context.
@@ -400,6 +467,8 @@ impl Container {
                     providers: self.providers.clone(),
                     singletons: self.singletons.clone(),
                     request_values: None,
+                    lifecycle: self.lifecycle.clone(),
+                    async_owner: None,
                 };
                 (definition.factory)(&root)
             } else {
@@ -416,12 +485,26 @@ impl Container {
                 providers: self.providers.clone(),
                 singletons: self.singletons.clone(),
                 request_values: Some(Arc::default()),
+                lifecycle: self.lifecycle.clone(),
+                async_owner: self.async_owner,
             },
         }
     }
     /// Eagerly construct singletons so factory failures are reported before listening.
     /// Request and transient factories are constructed only when resolved.
     pub fn initialize(&self) -> Result<(), InjectError> {
+        if !self
+            .lifecycle
+            .ready
+            .load(std::sync::atomic::Ordering::Acquire)
+            && let Some(definition) = self.providers.values().find(|p| {
+                p.async_factory.is_some() || p.init_hook.is_some() || p.shutdown_hook.is_some()
+            })
+        {
+            return Err(InjectError::AsyncInitializationRequired(
+                definition.key.name,
+            ));
+        }
         for definition in self
             .providers
             .values()
@@ -495,12 +578,21 @@ impl ContainerBuilder {
                 }
             }
         }
+        for provider in providers.values() {
+            if provider.scope != Scope::Singleton
+                && (provider.init_hook.is_some() || provider.shutdown_hook.is_some())
+            {
+                return Err(InjectError::InvalidLifecycleScope(provider.key.name));
+            }
+        }
         validate_provider_scopes(&providers)?;
         validate_provider_cycles(&providers)?;
         Ok(Container {
             providers: Arc::new(providers),
             singletons: Arc::default(),
             request_values: None,
+            lifecycle: Arc::default(),
+            async_owner: None,
         })
     }
 }

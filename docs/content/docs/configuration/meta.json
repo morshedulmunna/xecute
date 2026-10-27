@@ -1,0 +1,10 @@
+{
+  "title": "Configuration and operations",
+  "pages": [
+    "application",
+    "typed",
+    "logging",
+    "server-defaults",
+    "welcome"
+  ]
+}

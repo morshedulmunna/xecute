@@ -24,7 +24,12 @@ pub fn expand(attribute: TokenStream, item: TokenStream) -> TokenStream {
             Ok(middleware) => middleware,
             Err(error) => return error.into_compile_error().into(),
         };
-        let wrapped = crate::middleware::wrap(quote!(router), &middleware);
+        let guards = match crate::guards::take(&mut structure.attrs) {
+            Ok(guards) => guards,
+            Err(error) => return error.into_compile_error().into(),
+        };
+        let wrapped = crate::guards::wrap(quote!(router), &guards);
+        let wrapped = crate::middleware::wrap(wrapped, &middleware);
         let name = &structure.ident;
         return quote! {
             #structure

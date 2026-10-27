@@ -1,0 +1,11 @@
+{
+  "title": "Architecture and DI",
+  "pages": [
+    "project-structure",
+    "mvc-cqrs",
+    "modules",
+    "feature-folders",
+    "scopes",
+    "lifecycle"
+  ]
+}

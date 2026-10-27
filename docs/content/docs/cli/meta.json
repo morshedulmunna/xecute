@@ -1,0 +1,9 @@
+{
+  "title": "CLI and workspaces",
+  "pages": [
+    "commands",
+    "development",
+    "workspaces",
+    "update"
+  ]
+}

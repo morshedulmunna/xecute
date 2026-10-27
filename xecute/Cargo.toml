@@ -14,18 +14,28 @@ categories = ["web-programming", "rust-patterns"]
 
 [features]
 default = []
-testing = ["dep:tower", "dep:tokio"]
-upload = ["axum/multipart", "dep:tokio", "tokio/fs", "tokio/io-util", "tokio/rt", "dep:tempfile", "dep:infer", "dep:sha2"]
+cqrs = ["dep:futures-util"]
+jobs = ["tokio/rt", "tokio/macros"]
+cache = []
+cache-redis = ["cache", "dep:redis"]
+auth = ["dep:jsonwebtoken"]
+postgres = ["dep:sqlx"]
+testing = ["dep:tower"]
+upload = ["axum/multipart", "tokio/fs", "tokio/io-util", "tokio/rt", "dep:tempfile", "dep:infer", "dep:sha2"]
 upload-s3 = ["upload", "dep:aws-sdk-s3", "dep:aws-config"]
 
 [dependencies]
+futures-util = { version = "0.3", optional = true, default-features = false, features = ["std", "async-await"] }
+redis = { version = "1.7", optional = true, default-features = false, features = ["tokio-rustls-comp", "connection-manager"] }
+jsonwebtoken = { version = "11.1", optional = true, default-features = false, features = ["rust_crypto", "use_pem"] }
+sqlx = { version = "0.9", optional = true, default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "migrate"] }
 aws-sdk-s3 = { version = "1", optional = true, default-features = false, features = ["rt-tokio", "rustls", "default-https-client"] }
 aws-config = { version = "1", optional = true, default-features = false, features = ["rt-tokio", "default-https-client"] }
 tempfile = { version = "3", optional = true }
 infer = { version = "0.22", optional = true }
 sha2 = { version = "0.11", optional = true }
 toml = "1"
-tokio = { version = "1", features = ["time"], optional = true }
+tokio = { version = "1", features = ["time", "sync"] }
 tower = { version = "0.5", features = ["util"], optional = true }
 axum = "0.8"
 schemars = "1.2"
@@ -39,10 +49,27 @@ xmacros = { version = "0.1.6", path = "../xmacros" }
 workspace = true
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "sync"] }
+url = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "sync", "test-util"] }
 tower = { version = "0.5", features = ["util"] }
 serde_json = "1"
 
 [[example]]
 name = "file_upload"
 required-features = ["upload"]
+
+[[example]]
+name = "postgres"
+required-features = ["postgres"]
+
+[[example]]
+name = "auth"
+required-features = ["auth"]
+
+[[example]]
+name = "jobs_cache"
+required-features = ["jobs", "cache"]
+
+[[example]]
+name = "cqrs"
+required-features = ["cqrs"]

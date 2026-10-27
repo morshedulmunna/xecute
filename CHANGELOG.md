@@ -7,6 +7,39 @@ created projects and resources.
 
 ## [Unreleased]
 
+### Added
+
+- Optional typed CommandBus/QueryBus dispatch and observable EventBus fan-out,
+  with immutable registrations, shared execution behaviors, explicit typed context,
+  DI scope/module validation, cancellation ownership, and safe panic reports.
+- Add a complete HTTP CQRS example with separate DTOs and event subscribers,
+  an adoption/architecture guide, and routing/pipeline/DI/failure/cancellation tests.
+
+- Optional bounded in-process background queues with receipts, retry/timeout
+  policies, panic isolation, graceful draining and fixed-interval schedules.
+- Optional bounded memory TTL/LRU cache and namespaced Redis cache, with explicit
+  invalidation, safe errors and lifecycle cleanup. Add a worker/cache example,
+  guides, deterministic unit tests, and live Redis CI coverage.
+
+- Executable application/controller/route guards and additive role/permission
+  policies. Add optional pinned HS256/RS256 bearer authentication, verified-user
+  extraction, DI-backed verifier resolution, and safe 401/403 responses.
+- Add an authentication guide and runnable demo, real signature and HTTP tests,
+  and macro checks for invalid/empty authorization declarations.
+
+- Optional SQLx PostgreSQL integration with validated/redacted configuration,
+  lifecycle-managed connection pools, startup migrations, readiness checks, and
+  native transactions. Include a module/repository example, setup/deployment
+  documentation, and live PostgreSQL CI tests.
+
+- Async singleton factories with dependency-ordered `initialize_async`, async
+  startup/cleanup hooks, and explicit reverse-order `shutdown_async`.
+- Serialize lifecycle calls across container clones, roll back failed startup,
+  preserve dependency validation across await points, and support cancellation
+  recovery through explicit shutdown.
+- Add `TestingModule::compile_async`, a runnable lifecycle example, and tests for
+  ordering, concurrency, failures, cancellation, overrides, and validation.
+
 ## [0.1.19] - 2026-10-27
 
 Packages: `xecute-cli 0.1.19`, unchanged `xecute 0.1.9` and `xmacros 0.1.7`.

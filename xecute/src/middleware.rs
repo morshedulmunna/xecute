@@ -46,6 +46,7 @@ where
 pub struct Application {
     router: Router,
     middleware: Vec<Box<dyn FnOnce(Router) -> Router + Send>>,
+    guards: Vec<Box<dyn FnOnce(Router) -> Router + Send>>,
 }
 
 impl Application {
@@ -54,6 +55,7 @@ impl Application {
         Self {
             router,
             middleware: Vec::new(),
+            guards: Vec::new(),
         }
     }
 
@@ -70,11 +72,29 @@ impl Application {
         self
     }
 
-    /// Build the router with all registered middleware in declaration order.
+    /// Register a global guard, run after application middleware in registration order.
+    /// Return the request to continue or a safe error response to stop execution.
+    pub fn use_guard<F, Fut, E>(mut self, guard: F) -> Self
+    where
+        F: Fn(Request) -> Fut + Clone + Send + Sync + 'static,
+        Fut: Future<Output = Result<Request, E>> + Send + 'static,
+        E: IntoResponse + Send + 'static,
+    {
+        self.guards
+            .push(Box::new(move |router| crate::guards::apply(router, guard)));
+        self
+    }
+
+    /// Build middleware followed by guards, each in declaration order.
     pub fn into_router(self) -> Router {
+        let router = self
+            .guards
+            .into_iter()
+            .rev()
+            .fold(self.router, |router, wrap| wrap(router));
         self.middleware
             .into_iter()
             .rev()
-            .fold(self.router, |router, wrap| wrap(router))
+            .fold(router, |router, wrap| wrap(router))
     }
 }

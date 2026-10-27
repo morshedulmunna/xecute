@@ -1,0 +1,22 @@
+import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
+import { GIT_BRANCH } from './constants';
+
+export function baseOptions(): BaseLayoutProps {
+    return {
+        nav: {
+            title: (
+                <>
+                    <img src={`${import.meta.env.BASE_URL}logo.svg`} alt='' width={28} height={28} className='mr-1.5' />
+                    <span className='text-base font-bold tracking-tight'>Xecute</span>
+                    <span className='inline-flex items-center gap-1 rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300 ml-1.5 max-md:hidden'>
+                        <span className='relative flex size-1.5'>
+                            <span className='absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75' />
+                            <span className='relative inline-flex size-1.5 rounded-full bg-emerald-500' />
+                        </span>
+                        {GIT_BRANCH}
+                    </span>
+                </>
+            ),
+        },
+    };
+}

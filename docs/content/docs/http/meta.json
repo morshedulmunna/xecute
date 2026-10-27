@@ -1,0 +1,13 @@
+{
+  "title": "HTTP APIs",
+  "pages": [
+    "controllers",
+    "validation",
+    "middleware",
+    "openapi",
+    "errors",
+    "versioning",
+    "uploads",
+    "static-files"
+  ]
+}

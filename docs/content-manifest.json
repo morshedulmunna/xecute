@@ -1,0 +1,591 @@
+{
+  "categories": [
+    {
+      "slug": "getting-started",
+      "title": "Getting started",
+      "pages": [
+        "quickstart",
+        "first-feature",
+        "request-flow",
+        "coming-from-nestjs",
+        "status",
+        "adopting-existing"
+      ]
+    },
+    {
+      "slug": "cli",
+      "title": "CLI and workspaces",
+      "pages": [
+        "commands",
+        "development",
+        "workspaces",
+        "update"
+      ]
+    },
+    {
+      "slug": "architecture",
+      "title": "Architecture and DI",
+      "pages": [
+        "project-structure",
+        "mvc-cqrs",
+        "modules",
+        "feature-folders",
+        "scopes",
+        "lifecycle"
+      ]
+    },
+    {
+      "slug": "http",
+      "title": "HTTP APIs",
+      "pages": [
+        "controllers",
+        "validation",
+        "middleware",
+        "openapi",
+        "errors",
+        "versioning",
+        "uploads",
+        "static-files"
+      ]
+    },
+    {
+      "slug": "configuration",
+      "title": "Configuration and operations",
+      "pages": [
+        "application",
+        "typed",
+        "logging",
+        "server-defaults",
+        "welcome"
+      ]
+    },
+    {
+      "slug": "integrations",
+      "title": "Opt-in runtime features",
+      "pages": [
+        "postgres",
+        "auth",
+        "jobs",
+        "cache",
+        "cqrs"
+      ]
+    },
+    {
+      "slug": "testing",
+      "title": "Testing",
+      "pages": [
+        "checks",
+        "modules",
+        "examples"
+      ]
+    },
+    {
+      "slug": "operations",
+      "title": "Deployment and maintenance",
+      "pages": [
+        "deployment",
+        "contributing",
+        "troubleshooting",
+        "limitations"
+      ]
+    },
+    {
+      "slug": "reference",
+      "title": "Reference",
+      "pages": [
+        "features",
+        "releases",
+        "changelog"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "route": "",
+      "title": "Learn Xecute",
+      "description": "A guided path from your first Rust API to modules, testing, and integrations.",
+      "source": "docs/handbook/index.md"
+    },
+    {
+      "route": "getting-started/quickstart",
+      "title": "Build your first API",
+      "description": "Install Xecute, run an API, and understand your first successful and invalid requests.",
+      "source": "docs/handbook/quickstart.md"
+    },
+    {
+      "route": "getting-started/first-feature",
+      "title": "Your first feature",
+      "description": "Generate a user feature, find the right files, change a rule, and run tests.",
+      "source": "docs/handbook/first-feature.md"
+    },
+    {
+      "route": "getting-started/request-flow",
+      "title": "How a request works",
+      "description": "Understand DTOs, controllers, services, repositories, and module imports.",
+      "source": "docs/handbook/request-flow.md"
+    },
+    {
+      "route": "getting-started/status",
+      "title": "Published and source features",
+      "description": "Understand the current release, local features and generator defaults.",
+      "source": "docs/handbook/status.md"
+    },
+    {
+      "route": "getting-started/adopting-existing",
+      "title": "Upgrade an existing application",
+      "description": "Enable the five new runtime capabilities without assuming files are regenerated.",
+      "source": "docs/handbook/adopting-existing.md"
+    },
+    {
+      "route": "getting-started/coming-from-nestjs",
+      "title": "Coming from NestJS",
+      "description": "Map NestJS concepts to the APIs actually implemented in Xecute.",
+      "source": "docs/handbook/coming-from-nestjs.md"
+    },
+    {
+      "route": "cli/commands",
+      "title": "CLI reference",
+      "description": "Project creation, resource generators and supported flags.",
+      "source": "README.md",
+      "heading": "CLI reference",
+      "intro": "Use this page when you know what you want to generate and need the exact command or flag. Run resource generators beside your application\u2019s Cargo.toml.",
+      "next": {
+        "route": "cli/development",
+        "title": "Development runner"
+      }
+    },
+    {
+      "route": "cli/development",
+      "title": "Development runner",
+      "description": "Watch, rebuild, recover from errors and shut down development processes.",
+      "source": "README.md",
+      "heading": "Development server and hot reload",
+      "intro": "Keep a development server running while you edit Rust files. Start with a generated application; this runner rebuilds and restarts it when watched files change.",
+      "next": {
+        "route": "cli/workspaces",
+        "title": "Cargo workspaces"
+      }
+    },
+    {
+      "route": "cli/workspaces",
+      "title": "Cargo workspaces",
+      "description": "Generate multiple applications with shared dependencies and tooling.",
+      "source": "README.md",
+      "heading": "Multiple applications with Cargo workspaces",
+      "intro": "Choose a workspace when several applications should share dependency declarations and repository tooling. A single application does not need this setup.",
+      "next": {
+        "route": "cli/update",
+        "title": "Update and uninstall"
+      }
+    },
+    {
+      "route": "cli/update",
+      "title": "Update and uninstall",
+      "description": "Manage CLI installation without rewriting application source.",
+      "source": "README.md",
+      "heading": "Update and uninstall",
+      "intro": "Update the installed CLI executable or remove it. Updating the CLI does not rewrite an application you already generated.",
+      "next": {
+        "route": "",
+        "title": "Choose your next guide"
+      }
+    },
+    {
+      "route": "architecture/project-structure",
+      "title": "Project structure",
+      "description": "Understand generated modules, server infrastructure and feature folders.",
+      "source": "README.md",
+      "heading": "Project structure",
+      "intro": "Use this directory map to find the file you need to edit. Start in src/modules for feature work; use src/server for shared HTTP behavior.",
+      "next": {
+        "route": "architecture/mvc-cqrs",
+        "title": "MVC and CQRS"
+      }
+    },
+    {
+      "route": "architecture/mvc-cqrs",
+      "title": "MVC and CQRS",
+      "description": "Choose service-based MVC or direct-handler CQRS generation.",
+      "source": "README.md",
+      "heading": "MVC and CQRS",
+      "intro": "MVC uses a service to coordinate operations. CQRS gives each read or write its own handler. Both use DTOs and repositories; start with MVC if you are unsure.",
+      "next": {
+        "route": "architecture/modules",
+        "title": "Providers and modules"
+      }
+    },
+    {
+      "route": "architecture/modules",
+      "title": "Providers and modules",
+      "description": "Register providers and enforce imports, exports and dependency boundaries.",
+      "source": "README.md",
+      "heading": "Dependency injection and modules",
+      "intro": "Learn how Xecute creates dependencies and shares them between features. First understand the controller \u2192 service \u2192 repository flow; then read registration, imports, and exports below.",
+      "next": {
+        "route": "architecture/feature-folders",
+        "title": "Feature folders"
+      }
+    },
+    {
+      "route": "architecture/feature-folders",
+      "title": "Feature folders",
+      "description": "Keep DTOs, entities, repositories and tests together by feature.",
+      "source": "README.md",
+      "heading": "Feature module folders",
+      "intro": "Keep one feature\u2019s request types, records, storage, and tests together. Use this guide when your feature starts growing beyond its controller.",
+      "next": {
+        "route": "architecture/scopes",
+        "title": "Provider scopes"
+      }
+    },
+    {
+      "route": "architecture/scopes",
+      "title": "Provider scopes",
+      "description": "Use singleton, transient and request lifetimes safely.",
+      "source": "README.md",
+      "heading": "Provider lifecycles and HTTP requests",
+      "intro": "Choose how long an injected provider lives. Start with the generated singleton behavior; use request or transient scopes only when your application needs a different lifetime.",
+      "next": {
+        "route": "architecture/lifecycle",
+        "title": "Async startup and shutdown"
+      }
+    },
+    {
+      "route": "architecture/lifecycle",
+      "title": "Async startup and shutdown",
+      "description": "Initialize resources in dependency order and clean up after draining.",
+      "source": "xecute/README.md",
+      "heading": "Async providers and application lifecycle",
+      "level": 3,
+      "unreleased": true,
+      "intro": "Use lifecycle hooks when resources must connect before requests start and close after work drains. Follow the async startup path below; attribute markers alone do not execute hooks.",
+      "next": {
+        "route": "",
+        "title": "Choose your next guide"
+      }
+    },
+    {
+      "route": "http/controllers",
+      "title": "Controllers and extractors",
+      "description": "Route handlers, JSON bodies, path parameters and query DTOs.",
+      "source": "README.md",
+      "heading": "Controllers and routing",
+      "intro": "A controller connects an HTTP request to an application operation. Use the example below inside a generated user feature, then choose body, path, or query inputs from the extractor table.",
+      "next": {
+        "route": "http/validation",
+        "title": "DTO validation"
+      }
+    },
+    {
+      "route": "http/validation",
+      "title": "DTO validation",
+      "description": "Reject malformed and invalid requests before application work.",
+      "source": "README.md",
+      "heading": "DTO validation and errors",
+      "intro": "Put request rules in DTO structs under dto/mod.rs. Read the example, then use the status table to understand which requests are rejected before your handler runs.",
+      "next": {
+        "route": "http/middleware",
+        "title": "Middleware"
+      }
+    },
+    {
+      "route": "http/middleware",
+      "title": "Middleware",
+      "description": "Compose app, controller and route middleware in documented order.",
+      "source": "README.md",
+      "heading": "Middleware",
+      "intro": "Middleware wraps requests and responses around a handler. Use it for shared HTTP behavior; follow the execution order below before combining application, controller, and route middleware.",
+      "next": {
+        "route": "http/openapi",
+        "title": "Swagger and OpenAPI"
+      }
+    },
+    {
+      "route": "http/openapi",
+      "title": "Swagger and OpenAPI",
+      "description": "Generate OpenAPI schemas and serve local Swagger documentation.",
+      "source": "README.md",
+      "heading": "Swagger and OpenAPI",
+      "intro": "Use Swagger to try endpoints and OpenAPI to describe their contract. Start with the generated /docs/ endpoint, then add metadata when you add routes or change DTOs.",
+      "next": {
+        "route": "http/errors",
+        "title": "Errors and domain mappings"
+      }
+    },
+    {
+      "route": "http/errors",
+      "title": "Errors and domain mappings",
+      "description": "Map failures to safe correlated HTTP error envelopes.",
+      "source": "README.md",
+      "heading": "Exception handling and domain mappings",
+      "intro": "Turn application failures into safe HTTP responses. Choose a status and public message deliberately; keep internal errors out of the response.",
+      "next": {
+        "route": "http/versioning",
+        "title": "API version groups"
+      }
+    },
+    {
+      "route": "http/versioning",
+      "title": "API version groups",
+      "description": "Mount explicit versioned routes and separate API documents.",
+      "source": "README.md",
+      "heading": "API version groups and separate OpenAPI documents",
+      "intro": "Use explicit version groups when clients need different API contracts at the same time. Each group can have its own routes and API document.",
+      "next": {
+        "route": "http/uploads",
+        "title": "Multipart uploads"
+      }
+    },
+    {
+      "route": "http/uploads",
+      "title": "Multipart uploads",
+      "description": "Validate streaming uploads and use private local or optional S3 storage.",
+      "source": "README.md",
+      "heading": "Multipart file uploads",
+      "intro": "Use this guide for multipart file requests. It needs the upload feature and explicit storage configuration; ordinary JSON endpoints do not need it.",
+      "next": {
+        "route": "http/static-files",
+        "title": "Static files"
+      }
+    },
+    {
+      "route": "http/static-files",
+      "title": "Static files",
+      "description": "Serve explicitly public assets without exposing application files.",
+      "source": "README.md",
+      "heading": "Static files",
+      "intro": "Serve files that are intentionally public. Start with the generated public directory and /static/ prefix, then review path and fallback behavior before changing them.",
+      "next": {
+        "route": "",
+        "title": "Choose your next guide"
+      }
+    },
+    {
+      "route": "configuration/application",
+      "title": "Application configuration",
+      "description": "Configure generated servers through validated TOML and environment secrets.",
+      "source": "README.md",
+      "heading": "Application configuration",
+      "intro": "Start here to change generated server settings. Edit config/AppConfig.toml for application settings and use environment variables for secrets.",
+      "next": {
+        "route": "configuration/typed",
+        "title": "Typed configuration"
+      }
+    },
+    {
+      "route": "configuration/typed",
+      "title": "Typed configuration",
+      "description": "Read reusable typed configuration with redacted validation errors.",
+      "source": "README.md",
+      "heading": "Typed configuration",
+      "intro": "Use typed configuration when your own feature needs validated settings. Define a Rust type and read it at startup rather than parsing environment values inside every handler.",
+      "next": {
+        "route": "configuration/logging",
+        "title": "Logging and exporters"
+      }
+    },
+    {
+      "route": "configuration/logging",
+      "title": "Logging and exporters",
+      "description": "Configure structured logs, file rotation and custom exporter layers.",
+      "source": "README.md",
+      "heading": "File logging and external logging backends",
+      "intro": "Start with console logs, then configure file rotation or an exporter when you need them. This guide shows which logging behavior belongs to your generated application.",
+      "next": {
+        "route": "configuration/server-defaults",
+        "title": "Server defaults"
+      }
+    },
+    {
+      "route": "configuration/server-defaults",
+      "title": "Server defaults",
+      "description": "Understand request limits, health endpoints and graceful shutdown policies.",
+      "source": "README.md",
+      "heading": "Server defaults",
+      "intro": "Understand the policies your generated server already applies, including limits and health endpoints. Review this page before changing middleware or deploying.",
+      "next": {
+        "route": "configuration/welcome",
+        "title": "Welcome and startup URLs"
+      }
+    },
+    {
+      "route": "configuration/welcome",
+      "title": "Welcome and startup URLs",
+      "description": "Discover enabled documentation, static assets and route version groups.",
+      "source": "README.md",
+      "heading": "Welcome route and startup URLs",
+      "intro": "Use the welcome response and startup output to find your application\u2019s enabled URLs. Only configured routes and documents appear.",
+      "next": {
+        "route": "",
+        "title": "Choose your next guide"
+      }
+    },
+    {
+      "route": "integrations/postgres",
+      "title": "PostgreSQL",
+      "description": "Configure lifecycle-managed pools, migrations, repositories and transactions.",
+      "source": "xecute/docs/postgres.md",
+      "unreleased": true,
+      "intro": "Replace in-memory storage when records must survive a restart. You need a PostgreSQL server, a connection URL, and the postgres feature; follow configuration, provider registration, then repository examples.",
+      "next": {
+        "route": "integrations/auth",
+        "title": "Guards and JWT authentication"
+      }
+    },
+    {
+      "route": "integrations/auth",
+      "title": "Guards and JWT authentication",
+      "description": "Protect routes with verified users and role/permission policies.",
+      "source": "xecute/docs/auth.md",
+      "unreleased": true,
+      "intro": "Protect selected routes using verified identities. Configure a trusted token verifier before adding role or permission checks; reading an Authorization header is not authentication.",
+      "next": {
+        "route": "integrations/jobs",
+        "title": "Jobs and scheduling"
+      }
+    },
+    {
+      "route": "integrations/jobs",
+      "title": "Jobs and scheduling",
+      "description": "Run bounded process-local workers with retries, receipts and interval schedules.",
+      "source": "xecute/docs/jobs.md",
+      "unreleased": true,
+      "intro": "Move suitable work out of a request handler into bounded workers. These jobs run in the current process and are not durable across restart; choose that model before configuring retries.",
+      "next": {
+        "route": "integrations/cache",
+        "title": "Memory and Redis caching"
+      }
+    },
+    {
+      "route": "integrations/cache",
+      "title": "Memory and Redis caching",
+      "description": "Use explicit TTL caching with bounded memory or namespaced Redis.",
+      "source": "xecute/docs/cache.md",
+      "unreleased": true,
+      "intro": "Cache data that can be recomputed, with an explicit key and expiration. Start with memory caching; use Redis only when you need that backend and have a Redis service available.",
+      "next": {
+        "route": "integrations/cqrs",
+        "title": "CQRS buses and events"
+      }
+    },
+    {
+      "route": "integrations/cqrs",
+      "title": "CQRS buses and events",
+      "description": "Register typed command/query handlers, event subscribers and shared pipelines.",
+      "source": "xecute/docs/cqrs.md",
+      "unreleased": true,
+      "intro": "Use typed buses when you want central command/query dispatch or event subscribers. Generated CQRS already works through direct handler injection; adding buses is a separate application choice.",
+      "next": {
+        "route": "",
+        "title": "Choose your next guide"
+      }
+    },
+    {
+      "route": "testing/checks",
+      "title": "Quality checks",
+      "description": "Run runtime, generator and generated-application checks.",
+      "source": "README.md",
+      "heading": "Testing and quality checks",
+      "intro": "Run these commands from the generated application root before shipping a change. The page distinguishes application checks from checks for contributors working on Xecute itself.",
+      "next": {
+        "route": "testing/modules",
+        "title": "Testing modules and HTTP"
+      }
+    },
+    {
+      "route": "testing/modules",
+      "title": "Testing modules and HTTP",
+      "description": "Override providers and exercise real routers in isolated tests.",
+      "source": "README.md",
+      "heading": "Testing modules and HTTP assertions",
+      "intro": "Test HTTP behavior through a real router and replace providers when a test needs controlled data. Start with the generated feature tests, then use overrides for external dependencies.",
+      "next": {
+        "route": "testing/examples",
+        "title": "Runnable examples"
+      }
+    },
+    {
+      "route": "testing/examples",
+      "title": "Runnable examples",
+      "description": "Find feature flags, commands and external services for each example.",
+      "source": "docs/handbook/examples.md"
+    },
+    {
+      "route": "operations/deployment",
+      "title": "Deployment",
+      "description": "Build, containerize and operate generated applications.",
+      "source": "README.md",
+      "heading": "Deployment",
+      "intro": "Deploy a generated application after it builds and passes tests locally. Follow the release/container instructions and supply your own production configuration and secrets.",
+      "next": {
+        "route": "operations/contributing",
+        "title": "Development and packages"
+      }
+    },
+    {
+      "route": "operations/contributing",
+      "title": "Development and packages",
+      "description": "Work on the CLI, runtime and macro crates.",
+      "source": "README.md",
+      "heading": "Development and packages",
+      "intro": "This page is for changing Xecute itself, rather than building an application with it. It explains the repository packages and contributor checks.",
+      "next": {
+        "route": "operations/troubleshooting",
+        "title": "Troubleshooting"
+      }
+    },
+    {
+      "route": "operations/troubleshooting",
+      "title": "Troubleshooting",
+      "description": "Resolve common generation and application startup issues.",
+      "source": "README.md",
+      "heading": "Troubleshooting",
+      "intro": "Find the symptom closest to yours in the table below. Read the full command output first, and check whether you are in the generated application or the Xecute repository.",
+      "next": {
+        "route": "operations/limitations",
+        "title": "Scope and limitations"
+      }
+    },
+    {
+      "route": "operations/limitations",
+      "title": "Scope and limitations",
+      "description": "Separate implemented capabilities from application extensions.",
+      "source": "README.md",
+      "heading": "Scope and limitations",
+      "intro": "Check this page before planning around a capability. It separates generated behavior from features you must implement or configure in your application.",
+      "next": {
+        "route": "",
+        "title": "Choose your next guide"
+      }
+    },
+    {
+      "route": "reference/features",
+      "title": "Cargo feature reference",
+      "description": "Enable only the runtime capabilities an application needs.",
+      "source": "docs/handbook/features.md"
+    },
+    {
+      "route": "reference/releases",
+      "title": "Release process",
+      "description": "Understand crate versions, tags and generated GitHub release notes.",
+      "source": "README.md",
+      "heading": "Changelog and GitHub releases",
+      "intro": "This page is for maintainers publishing Xecute packages. Application users normally want the CLI update guide instead.",
+      "next": {
+        "route": "reference/changelog",
+        "title": "Changelog"
+      }
+    },
+    {
+      "route": "reference/changelog",
+      "title": "Changelog",
+      "description": "Review published CLI history and unreleased source changes.",
+      "source": "CHANGELOG.md",
+      "intro": "Check which release introduced a change. Unreleased entries describe source work and do not mean the feature is available in a published package.",
+      "next": {
+        "route": "",
+        "title": "Choose your next guide"
+      }
+    }
+  ]
+}

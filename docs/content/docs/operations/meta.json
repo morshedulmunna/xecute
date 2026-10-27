@@ -1,0 +1,9 @@
+{
+  "title": "Deployment and maintenance",
+  "pages": [
+    "deployment",
+    "contributing",
+    "troubleshooting",
+    "limitations"
+  ]
+}

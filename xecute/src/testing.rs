@@ -58,6 +58,20 @@ impl TestingModule {
     }
     /// Validate the final graph and eagerly initialize singletons before a test sends requests.
     pub fn compile(self) -> Result<Container, InjectError> {
+        let container = self.build()?;
+        container.initialize()?;
+        Ok(container)
+    }
+
+    /// Validate and initialize async singleton factories and hooks for an isolated test.
+    /// Call shutdown_async on the returned container after the test finishes.
+    pub async fn compile_async(self) -> Result<Container, InjectError> {
+        let container = self.build()?;
+        container.initialize_async().await?;
+        Ok(container)
+    }
+
+    fn build(self) -> Result<Container, InjectError> {
         // Keep the standalone providers in their own synthetic module so the same graph
         // validation and override rules apply to both entry points.
         let mut modules = self.modules;
@@ -67,9 +81,7 @@ impl TestingModule {
             extra = extra.provider(provider);
         }
         modules.push(extra);
-        let container = ModuleGraph::new(modules).build_with_overrides(self.overrides)?;
-        container.initialize()?;
-        Ok(container)
+        ModuleGraph::new(modules).build_with_overrides(self.overrides)
     }
 }
 

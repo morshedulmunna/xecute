@@ -130,8 +130,13 @@ commented credential examples, with no active configuration or fake secrets.
 The project pins Rust 1.98.1 in `rust-toolchain.toml`, includes rustfmt, Clippy,
 EditorConfig, and a dependency lockfile. Commit `Cargo.lock`; use `--locked` in
 CI and releases. After changing dependencies, run `cargo generate-lockfile` and
-review the updated lockfile. Projects using `--runtime-path` must regenerate
-their lockfile locally before running locked builds.
+review the updated lockfile. Setup runs `cargo generate-lockfile` to resolve the
+latest stable versions allowed by the template’s compatibility ranges, including
+transitive dependencies. This also applies to `--runtime-path` projects. Registry
+access is required (unless Cargo is explicitly configured to use its offline cache).
+If resolution fails, the generated files remain; fix registry/network access and
+run `cargo generate-lockfile` inside the project before using `--locked`. Breaking
+major upgrades require a compatible template; setup does not use wildcard versions.
 
 ```sh
 cargo fmt --all -- --check
@@ -699,3 +704,15 @@ Set `api.versioning_enabled = false` to keep only unversioned aliases. Set
 active. `GET /` lists each enabled version's Swagger and OpenAPI paths.
 The registration pattern is explicit URL versioning; header-based versioning and
 automatic deprecation/sunset behavior are not implied.
+
+
+## Optional CQRS bus adoption
+
+The runtime's local `cqrs` feature adds typed command/query buses, event fan-out
+and shared execution pipelines. Generated CQRS resources keep their direct-handler
+flow by default; existing applications are not rewritten. To opt in, implement
+message/handler traits, explicitly register the configured buses, then inject them
+into controllers. See the source repository's `xecute/docs/cqrs.md` and
+`xecute/examples/cqrs/` for the complete adoption guide and HTTP example. Prior
+published runtimes do not include this feature; use the matching local runtime
+until it is released.

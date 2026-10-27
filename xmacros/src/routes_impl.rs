@@ -94,6 +94,7 @@ fn generate(
         ));
     }
     let controller_middleware = crate::middleware::take(&mut implementation.attrs)?;
+    let controller_guards = crate::guards::take(&mut implementation.attrs)?;
     let mut routes = Vec::new();
     let mut scoped_routes = Vec::new();
     let mut adapters = Vec::new();
@@ -111,6 +112,7 @@ fn generate(
             ));
         }
         let route_middleware = crate::middleware::take(&mut method.attrs)?;
+        let route_guards = crate::guards::take(&mut method.attrs)?;
         let mut route = None;
         let mut retained = Vec::new();
         let mut summary = quote!("");
@@ -207,10 +209,10 @@ fn generate(
         }
         method.attrs = retained;
         let Some((verb, suffix)) = route else {
-            if !route_middleware.is_empty() || multipart_body {
+            if !route_middleware.is_empty() || !route_guards.is_empty() || multipart_body {
                 return Err(syn::Error::new_spanned(
                     &method.sig,
-                    "middleware requires an HTTP route attribute",
+                    "middleware, guards, and body metadata require an HTTP route attribute",
                 ));
             }
             continue;
@@ -359,6 +361,11 @@ fn generate(
         });
         let mut scoped_method_router = quote!(::axum::routing::#verb(Self::#scoped_handler));
         let mut method_router = quote!(::axum::routing::#verb(Self::#selected_handler));
+        for guard in route_guards.iter().rev() {
+            method_router = quote!(::xecute::guards::apply_method(#method_router, #guard));
+            scoped_method_router =
+                quote!(::xecute::guards::apply_method(#scoped_method_router, #guard));
+        }
         for function in route_middleware.iter().rev() {
             method_router = quote!(#method_router.layer(::axum::middleware::from_fn(#function)));
             scoped_method_router =
@@ -377,6 +384,7 @@ fn generate(
     }
     implementation.items.extend(adapters);
     let router = quote!(::axum::Router::new() #(#routes)* .with_state(controller));
+    let router = crate::guards::wrap(router, &controller_guards);
     let router = crate::middleware::wrap(router, &controller_middleware);
     let router = if uses_struct_prefix {
         quote!(Self::__xecute_controller_middleware(#router))
@@ -390,6 +398,7 @@ fn generate(
         }
     });
     let scoped_router = quote!(::axum::Router::new() #(#scoped_routes)*);
+    let scoped_router = crate::guards::wrap(scoped_router, &controller_guards);
     let scoped_router = crate::middleware::wrap(scoped_router, &controller_middleware);
     let scoped_router = if uses_struct_prefix {
         quote!(Self::__xecute_controller_middleware(#scoped_router))
@@ -414,6 +423,21 @@ fn generate(
 mod tests {
     use super::generate;
     use quote::quote;
+
+    #[test]
+    fn rejects_empty_policies_and_guard_annotations_on_non_routes() {
+        for item in [
+            quote! { impl Controller { #[get("")] #[guard()] async fn get() {} } },
+            quote! { impl Controller { #[get("")] #[roles()] async fn get() {} } },
+            quote! { impl Controller { #[get("")] #[roles(" ")] async fn get() {} } },
+            quote! { impl Controller { #[get("")] #[permissions("")] async fn get() {} } },
+            quote! { impl Controller { #[guard(auth)] async fn helper() {} #[get("")] async fn get() {} } },
+            quote! { impl Controller { #[permissions("read")] async fn helper() {} #[get("")] async fn get() {} } },
+            quote! { #[guard()] impl Controller { #[get("")] async fn get() {} } },
+        ] {
+            assert!(generate(quote!("/test"), item).is_err());
+        }
+    }
 
     #[test]
     fn rejects_empty_middleware_and_middleware_on_non_routes() {

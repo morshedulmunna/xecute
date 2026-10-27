@@ -11,6 +11,13 @@ Xecute keeps HTTP controllers thin. MVC resources delegate to an injectable
 service; CQRS resources delegate to separate command and query handlers. Both
 use an injectable repository and validated request DTOs.
 
+## Documentation
+
+The [documentation site source](docs/README.md) organizes this reference into
+topic guides, with explicit published/source feature availability and a walkthrough
+for adopting the new capabilities in an existing application. Run it locally with
+`cd docs && bun install --frozen-lockfile && bun run dev`.
+
 ## Contents
 
 - [Release status](#release-status)
@@ -111,7 +118,6 @@ cargo install --path xecute-cli --locked --force
 # Run from the repository root; the runtime is the nested xecute directory.
 xecute new local-app --runtime-path "$PWD/xecute"
 cd local-app
-cargo generate-lockfile
 cargo run
 ```
 
@@ -839,9 +845,15 @@ cargo test --all-targets --all-features --locked
 cargo build --release --locked
 ```
 
-Local runtime projects need an initial `cargo generate-lockfile` before locked
-builds. Commit the resulting `Cargo.lock`. Refresh it after intentional dependency
-changes and review the diff.
+New standalone projects resolve dependencies with `cargo generate-lockfile` during
+setup, including `--runtime-path` projects. This selects the latest stable versions
+within the template’s compatibility ranges, instead of copying a bundled lockfile.
+Registry access is required unless Cargo is configured for offline cached resolution.
+Resolution failures return an error and preserve generated files; fix registry/network
+access and rerun `cargo generate-lockfile` in the project. Commit `Cargo.lock` for
+reproducible builds. Breaking major upgrades require updated templates. Existing
+workspace apps retain shared dependency versions when adding another app; setup
+does not force upgrades across an existing workspace.
 
 Resource HTTP tests verify rejection before persistence and visibility of created
 records through subsequent reads. Server tests cover configuration, quota and
@@ -930,14 +942,26 @@ existing applications automatically.
 
 Xecute provides DI, module metadata, controller adapters, validation, HTTP
 middleware, API documentation, and starter application infrastructure. It does
-not currently generate an ORM/database integration, complete CRUD operations,
-authentication, message buses, event sourcing, or CQRS handler pipelines.
+not currently generate database-backed repositories, complete CRUD operations,
+login/session scaffolding, broker transports, or event sourcing. Optional
+SQLx PostgreSQL integration supports lifecycle-managed pools, migrations, and native
+transactions; see the [PostgreSQL guide](xecute/docs/postgres.md).
 
 The middleware API implements app, controller, and route scopes. `#[module]`
 describes DI boundaries and does not automatically attach HTTP middleware.
-Other reserved marker annotations, including guards, interceptors, lifecycle
-hooks, and exception decorators, are not complete execution systems; do not rely
-on them as operational middleware or lifecycle behavior.
+Executable guards support application, controller, and route policies. Optional
+JWT authentication and role/permission checks are documented in the
+[authentication guide](xecute/docs/auth.md). Optional [background jobs](xecute/docs/jobs.md)
+provide bounded process-local workers and interval schedules; [TTL caching](xecute/docs/cache.md)
+supports memory and Redis backends. Optional [CQRS buses](xecute/docs/cqrs.md)
+provide typed command/query dispatch, event fan-out and shared pipelines; direct
+handler CQRS remains supported. Reserved attribute markers, including
+interceptors, lifecycle attributes, and exception decorators, are not complete
+execution systems. Async lifecycle
+behavior is available through explicit provider registration methods:
+`singleton_async`, `on_init`, and `on_shutdown`; await `initialize_async` before
+serving and `shutdown_async` after request draining. See the
+[runtime lifecycle guide](xecute/README.md#async-providers-and-application-lifecycle).
 
 Licensed under **Apache-2.0**.
 

@@ -1,0 +1,44 @@
+name: Documentation checks
+
+on:
+  push:
+    paths:
+      - docs/**
+      - README.md
+      - CHANGELOG.md
+      - xecute/README.md
+      - xecute/docs/**
+      - xecute/Cargo.toml
+      - xecute-cli/Cargo.toml
+      - .github/workflows/docs.yml
+  pull_request:
+    paths:
+      - docs/**
+      - README.md
+      - CHANGELOG.md
+      - xecute/README.md
+      - xecute/docs/**
+      - xecute/Cargo.toml
+      - xecute-cli/Cargo.toml
+      - .github/workflows/docs.yml
+
+permissions:
+  contents: read
+
+jobs:
+  documentation:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - run: bun run check:docs
+      - run: bun run check:render
+      - run: bun run check-types
+      - run: bun run lint
+      - run: bun run build
