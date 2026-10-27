@@ -7,9 +7,10 @@
 //!   For multiple segments use one tuple or Deserialize struct with matching field names.
 //! - `#[query] query: SearchDto`: /__FEATURE__?limit=10; DTO must derive
 //!   Deserialize, Validate and JsonSchema. Use Option<T> for optional fields.
-//! - `headers: axum::http::HeaderMap`: request headers, including Authorization
-//!   and Cookie. Read with headers.get("authorization"); authentication and cookie
-//!   parsing require your own logic/middleware. There is no #[headers] marker.
+//! - `headers: axum::http::HeaderMap`: raw request headers, including Authorization
+//!   and Cookie. Prefer a guard plus a custom `FromRequestParts` extractor for
+//!   authentication; read headers directly only for feature-specific logic.
+//!   There is no #[headers] marker.
 //! - `form: axum::extract::Form<FormDto>`: URL-encoded form body; FormDto derives
 //!   Deserialize. Call validator explicitly if needed (unlike #[body]/#[query]).
 //! - `body: String`: raw UTF-8 text; `body: axum::body::Bytes`: raw binary body.
@@ -33,6 +34,14 @@
 //! async fn submit(&self, form: axum::extract::Form<FormDto>) -> String {
 //!     // Pass form.0 to your service or command handler.
 //!     "Accepted".into()
+//! }
+//!
+//! #[get("/me")]
+//! #[guard(require_auth)]
+//! async fn me(&self, current_user: CurrentUser) -> Json<u64> {
+//!     // The guard verifies credentials and installs request extensions; the
+//!     // extractor reads them. Equivalent to NestJS @UseGuards + @CurrentUser.
+//!     Json(0)
 //! }
 //! ```
 //! Use at most one body-consuming extractor (JSON, form, text, bytes, multipart,
