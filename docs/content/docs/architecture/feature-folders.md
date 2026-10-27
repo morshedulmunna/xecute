@@ -5,11 +5,12 @@ description: "Keep DTOs, entities, repositories and tests together by feature."
 
 Keep one feature’s request types, records, storage, and tests together. Use this guide when your feature starts growing beyond its controller.
 
-All newly generated resources and standalone modules, controllers, and services
-live under `src/modules/<feature>/`. Each resource keeps its controller, DI module,
-DTOs, entities, repository, and HTTP tests together. CQRS resources also contain
-commands and queries. `src/modules/mod.rs` declares each feature;
-`AppModule` imports and mounts it through `crate::modules::<feature>`.
+All newly generated resources, standalone modules, controllers, services, and
+workers live under `src/modules/<feature>/`. Each resource keeps its controller,
+DI module, DTOs, entities, repository, and HTTP tests together. CQRS resources
+also contain commands and queries. Workers keep their payload, handler, queue
+provider, and optional broker transport together. `src/modules/mod.rs` declares
+each feature; `AppModule` imports and mounts it through `crate::modules::<feature>`.
 
 ```text
 src/

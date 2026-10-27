@@ -86,6 +86,30 @@ fn new_project_is_formatted_locked_and_accepts_resources() {
             .success()
     );
     assert!(
+        Command::new(binary)
+            .args(["g", "worker", "email"])
+            .current_dir(&project)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        Command::new(binary)
+            .args(["g", "worker", "notify", "--distributed", "--broker", "nats"])
+            .current_dir(&project)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        Command::new(binary)
+            .args(["g", "wo", "audit", "--broker", "rabbitmq"])
+            .current_dir(&project)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
         Command::new("cargo")
             .args(["fmt", "--all", "--", "--check"])
             .current_dir(&project)
@@ -131,6 +155,45 @@ fn new_project_is_formatted_locked_and_accepts_resources() {
     let app = fs::read_to_string(project.join("src/app_module.rs")).unwrap();
     assert!(app.contains("UserModule::definition()"));
     assert!(app.contains("UserModule::scoped_router"));
+    for file in [
+        "src/modules/email/job.rs",
+        "src/modules/email/module.rs",
+        "src/modules/email/mod.rs",
+    ] {
+        assert!(project.join(file).is_file(), "missing {file}");
+    }
+    assert!(app.contains("EmailModule::definition()"));
+    assert!(!app.contains("EmailModule::scoped_router"));
+    let worker = fs::read_to_string(project.join("src/modules/email/module.rs")).unwrap();
+    assert!(worker.contains("JobQueue::provider"));
+    assert!(worker.contains("JobQueue<EmailJob>"));
+    let manifest = fs::read_to_string(project.join("Cargo.toml")).unwrap();
+    assert!(manifest.contains("features = [\"jobs\"]"));
+    assert!(app.contains("initialize_async"));
+    for (feature, pascal, marker, dependency) in [
+        ("notify", "Notify", "queue_subscribe", "async-nats"),
+        ("audit", "Audit", "basic_publish", "lapin"),
+    ] {
+        for file in ["job.rs", "broker.rs", "module.rs", "mod.rs"] {
+            assert!(
+                project
+                    .join(format!("src/modules/{feature}/{file}"))
+                    .is_file(),
+                "missing {feature}/{file}"
+            );
+        }
+        let broker =
+            fs::read_to_string(project.join(format!("src/modules/{feature}/broker.rs"))).unwrap();
+        assert!(broker.contains(marker));
+        let module =
+            fs::read_to_string(project.join(format!("src/modules/{feature}/module.rs"))).unwrap();
+        assert!(module.contains("ProviderDefinition::singleton_async"));
+        assert!(module.contains(&format!(".export::<{pascal}Queue>()")));
+        assert!(app.contains(&format!("{pascal}Module::definition()")));
+        assert!(manifest.contains(dependency));
+    }
+    assert!(!app.contains("NotifyModule::scoped_router"));
+    assert!(!app.contains("AuditModule::scoped_router"));
     fs::remove_dir_all(root).unwrap();
 }
 

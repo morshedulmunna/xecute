@@ -10,10 +10,13 @@ async fn application_can_use_an_isolated_testing_container() {
     for definition in crate::app_module::AppModule::definitions() {
         module = module.module(definition);
     }
-    let container = Arc::new(module.compile().unwrap());
-    let routes = crate::app_module::AppModule::router_with_container(container).unwrap();
+    let container = Arc::new(module.compile_async().await.unwrap());
+    let routes = crate::app_module::AppModule::router_with_container(container.clone())
+        .await
+        .unwrap();
     let app = TestApp::new(crate::server::router(routes, &crate::configs::Config::default()));
     let _ = app.get("/").send().await.unwrap().assert_status(StatusCode::OK);
+    container.shutdown_async().await.unwrap();
 }
 
 #[tokio::test]

@@ -229,6 +229,44 @@ and command/query buses are optional extensions. The initial endpoints are GET
 Standalone module, controller, and service generators remain available in both
 architectures; standalone services are opt-in building blocks.
 
+## Background workers
+
+```sh
+xecute g worker email
+```
+
+This creates `src/modules/email/job.rs`, `module.rs`, and `mod.rs`, registers the
+module, and enables the runtime's `jobs` feature. The payload is `EmailJob` and
+the queue is available as `Arc<JobQueue<EmailJob>>` to modules that import
+`EmailModule`. Generated defaults are 64 waiting jobs, four workers, three
+attempts, a 250 ms retry delay, and a 30-second attempt timeout; edit
+`module.rs` to tune them. Queues drain when the server shuts down. Jobs are
+process-local and are not persisted or shared across machines.
+
+For durable, multi-process workers, add `--distributed`. `--broker` implies
+`--distributed` and accepts `postgres-outbox` (default), `rabbitmq`, or `nats`:
+
+```sh
+xecute g worker email --distributed
+xecute g worker email --broker rabbitmq
+xecute g worker email --distributed --broker nats
+```
+
+This adds `broker.rs` and exports `EmailQueue` plus `EmailQueueError`. Inject
+`Arc<EmailQueue>` into modules that import `EmailModule`, then call
+`queue.enqueue(EmailJob { .. }).await`.
+
+- PostgreSQL outbox stores jobs in `xecute_email_jobs`, uses `DATABASE_URL`,
+  claims with `FOR UPDATE SKIP LOCKED`, and retries up to three attempts.
+- RabbitMQ consumes a durable `email_jobs` queue, uses `RABBITMQ_URL`
+  (default `amqp://127.0.0.1:5672/%2f`), and republishes failures up to three
+  attempts.
+- NATS uses subject `email.jobs` and queue group `email-workers`, reads
+  `NATS_URL` (default `nats://127.0.0.1:4222`), and provides at-most-once
+  delivery; failures are logged without redelivery.
+
+Run additional processes or replicas to scale consumers.
+
 ## Middleware
 
 Register global middleware in `src/middleware.rs`:
@@ -586,11 +624,11 @@ deadlocks. Custom definitions can mark a declared dependency optional with
 
 Concurrent resolutions initialize each singleton/request provider once. Factory
 errors are cached for that scope; recover external connectivity inside a shared
-client instead of expecting factory retries. `container.initialize()` eagerly
-constructs singletons and is called before generated applications listen.
-Factories are synchronous: initialize asynchronous SDK/database clients at
-startup and register their handles as values. A transient injected into a
-singleton is created when that singleton is built, then retained by it.
+client instead of expecting factory retries. `container.initialize_async()`
+eagerly constructs asynchronous and synchronous singletons before generated
+applications listen. The generated server also calls `shutdown_async()` after the
+listener stops so queues drain and lifecycle hooks run. A transient injected into
+a singleton is created when that singleton is built, then retained by it.
 
 ## Testing modules and HTTP assertions
 
@@ -617,8 +655,8 @@ for definition in crate::app_module::AppModule::definitions() {
     module = module.module(definition);
 }
 // Example: module = module.override_value(DatabaseGateway(Arc::new(FakeDatabase)));
-let container = Arc::new(module.compile()?);
-let routes = crate::app_module::AppModule::router_with_container(container)?;
+let container = Arc::new(module.compile_async().await?);
+let routes = crate::app_module::AppModule::router_with_container(container.clone()).await?;
 let app = TestApp::new(crate::server::router(routes, &crate::configs::Config::default()));
 
 let response = app.post("/example")
@@ -626,6 +664,7 @@ let response = app.post("/example")
     .send().await?
     .assert_status(axum::http::StatusCode::CREATED);
 let body: serde_json::Value = response.json()?;
+container.shutdown_async().await?;
 ```
 
 Run these async helpers inside a Tokio runtime, such as `#[tokio::test]`.

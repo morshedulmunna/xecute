@@ -1,6 +1,36 @@
 //! Preserve Cargo manifest syntax while adding generated runtime and test dependencies.
 
-use toml_edit::{Array, DocumentMut, InlineTable, Item, Value, value};
+use toml_edit::{Array, DocumentMut, InlineTable, Item, TableLike, Value, value};
+
+/// Distributed worker transport selected when generating a worker.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum WorkerBroker {
+    /// Durable PostgreSQL outbox polled with `FOR UPDATE SKIP LOCKED`.
+    PostgresOutbox,
+    /// Durable RabbitMQ queue with retry republishing.
+    RabbitMq,
+    /// Core NATS queue group with at-most-once delivery.
+    Nats,
+}
+
+impl WorkerBroker {
+    pub(crate) fn parse(value: &str) -> Option<Self> {
+        match value {
+            "postgres" | "postgres-outbox" => Some(Self::PostgresOutbox),
+            "rabbitmq" | "rabbit-mq" | "amqp" => Some(Self::RabbitMq),
+            "nats" => Some(Self::Nats),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Self::PostgresOutbox => "postgres-outbox",
+            Self::RabbitMq => "rabbitmq",
+            Self::Nats => "nats",
+        }
+    }
+}
 
 fn upgrade_runtime(item: &mut Item) {
     let old = |version: &str| {
@@ -26,7 +56,7 @@ fn upgrade_runtime(item: &mut Item) {
         table.insert("version", value("0.1.10"));
     }
 }
-fn enable_testing(item: &mut Item) -> Result<(), String> {
+fn enable_feature(item: &mut Item, feature: &str) -> Result<(), String> {
     if let Some(version) = item.as_str() {
         let mut table = InlineTable::new();
         table.insert("version", Value::from(version));
@@ -44,14 +74,18 @@ fn enable_testing(item: &mut Item) -> Result<(), String> {
         .ok_or("xecute features must be an array")?;
     if !features
         .iter()
-        .any(|feature| feature.as_str() == Some("testing"))
+        .any(|declared| declared.as_str() == Some(feature))
     {
-        features.push("testing");
+        features.push(feature);
     }
     if let Some(inline) = item.as_inline_table_mut() {
         inline.fmt();
     }
     Ok(())
+}
+
+fn enable_testing(item: &mut Item) -> Result<(), String> {
+    enable_feature(item, "testing")
 }
 
 pub(crate) fn testing_dependency(declaration: &str) -> Result<String, String> {
@@ -102,6 +136,82 @@ pub(crate) fn resource_dependencies(manifest: &str) -> Result<String, String> {
         dev.insert("xecute", test_runtime);
     }
     Ok(document.to_string())
+}
+
+pub(crate) fn worker_dependencies(
+    manifest: &str,
+    broker: Option<WorkerBroker>,
+) -> Result<String, String> {
+    let mut document = manifest
+        .parse::<DocumentMut>()
+        .map_err(|_| "Cargo.toml is invalid; no files changed")?;
+    let dependencies = document
+        .get_mut("dependencies")
+        .and_then(Item::as_table_like_mut)
+        .ok_or("Cargo.toml is missing [dependencies]")?;
+    let postgres = broker == Some(WorkerBroker::PostgresOutbox);
+    let test_runtime = {
+        let runtime = dependencies
+            .get_mut("xecute")
+            .ok_or("Cargo.toml is missing the xecute dependency")?;
+        upgrade_runtime(runtime);
+        enable_feature(runtime, "jobs")?;
+        if postgres {
+            enable_feature(runtime, "postgres")?;
+        }
+        let mut test_runtime = runtime.clone();
+        enable_testing(&mut test_runtime)?;
+        test_runtime
+    };
+    if let Some(broker) = broker {
+        broker_dependencies(dependencies, broker);
+    }
+    if document.get("dev-dependencies").is_none() {
+        document["dev-dependencies"] = Item::Table(toml_edit::Table::new());
+    }
+    let dev = document
+        .get_mut("dev-dependencies")
+        .and_then(Item::as_table_like_mut)
+        .ok_or("invalid [dev-dependencies]")?;
+    if let Some(existing) = dev.get_mut("xecute") {
+        upgrade_runtime(existing);
+        enable_feature(existing, "jobs")?;
+        if postgres {
+            enable_feature(existing, "postgres")?;
+        }
+        enable_testing(existing)?;
+    } else {
+        dev.insert("xecute", test_runtime);
+    }
+    Ok(document.to_string())
+}
+
+fn broker_dependencies(dependencies: &mut dyn TableLike, broker: WorkerBroker) {
+    if !dependencies.contains_key("futures-util") && broker != WorkerBroker::PostgresOutbox {
+        dependencies.insert("futures-util", value("0.3"));
+    }
+    match broker {
+        WorkerBroker::PostgresOutbox => {}
+        WorkerBroker::RabbitMq => {
+            if !dependencies.contains_key("lapin") {
+                let mut lapin = InlineTable::new();
+                lapin.insert("version", "4.12".into());
+                lapin.insert("default-features", false.into());
+                let mut features = Array::new();
+                for feature in ["tokio", "rustls-platform-verifier", "rustls--ring"] {
+                    features.push(feature);
+                }
+                lapin.insert("features", features.into());
+                lapin.fmt();
+                dependencies.insert("lapin", Item::Value(Value::InlineTable(lapin)));
+            }
+        }
+        WorkerBroker::Nats => {
+            if !dependencies.contains_key("async-nats") {
+                dependencies.insert("async-nats", value("0.50"));
+            }
+        }
+    }
 }
 
 /// Lift dependency sources into the workspace, retaining member-specific features.
@@ -225,6 +335,113 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn worker_adds_jobs_features_and_preserves_existing_entries() {
+        for declaration in [
+            "xecute = \"0.1.6\"",
+            "xecute = { path = \"../runtime\", features = [\"cache\"] }",
+            "[dependencies.xecute]\npath = \"../runtime\"",
+        ] {
+            let input = format!(
+                "# keep this\n[package]\nname = \"example\"\n[dependencies]\n{declaration}\n"
+            );
+            let output = worker_dependencies(&input, None).unwrap();
+            let doc = output.parse::<DocumentMut>().unwrap();
+            assert!(output.contains("# keep this"));
+            assert!(
+                doc["dependencies"]["xecute"]["features"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|value| value.as_str() == Some("jobs"))
+            );
+            for feature in ["jobs", "testing"] {
+                assert!(
+                    doc["dev-dependencies"]["xecute"]["features"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .any(|value| value.as_str() == Some(feature)),
+                    "missing dev feature {feature}"
+                );
+            }
+            if declaration.contains("cache") {
+                assert!(
+                    doc["dependencies"]["xecute"]["features"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .any(|value| value.as_str() == Some("cache"))
+                );
+            }
+            assert_eq!(worker_dependencies(&output, None).unwrap(), output);
+        }
+    }
+
+    #[test]
+    fn distributed_workers_add_the_selected_broker_dependencies() {
+        let input = "[package]\nname = \"example\"\n[dependencies]\nxecute = \"0.1.10\"\n";
+        let postgres = worker_dependencies(input, Some(WorkerBroker::PostgresOutbox)).unwrap();
+        let doc = postgres.parse::<DocumentMut>().unwrap();
+        for feature in ["jobs", "postgres"] {
+            assert!(
+                doc["dependencies"]["xecute"]["features"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|value| value.as_str() == Some(feature))
+            );
+        }
+        assert!(
+            !doc["dependencies"]
+                .as_table()
+                .unwrap()
+                .contains_key("lapin")
+        );
+
+        for (broker, dependency) in [
+            (WorkerBroker::RabbitMq, "lapin"),
+            (WorkerBroker::Nats, "async-nats"),
+        ] {
+            let output = worker_dependencies(input, Some(broker)).unwrap();
+            let doc = output.parse::<DocumentMut>().unwrap();
+            assert!(
+                doc["dependencies"]
+                    .as_table()
+                    .unwrap()
+                    .contains_key(dependency)
+            );
+            assert_eq!(doc["dependencies"]["futures-util"].as_str(), Some("0.3"));
+            assert!(
+                doc["dev-dependencies"]["xecute"]["features"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|value| value.as_str() == Some("testing"))
+            );
+        }
+        let rabbit = worker_dependencies(input, Some(WorkerBroker::RabbitMq)).unwrap();
+        let doc = rabbit.parse::<DocumentMut>().unwrap();
+        assert_eq!(
+            doc["dependencies"]["lapin"]["version"].as_str(),
+            Some("4.12")
+        );
+        assert_eq!(
+            doc["dependencies"]["lapin"]["default-features"].as_bool(),
+            Some(false)
+        );
+        assert!(
+            doc["dependencies"]["lapin"]["features"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|value| value.as_str() == Some("tokio"))
+        );
+        let nats = worker_dependencies(input, Some(WorkerBroker::Nats)).unwrap();
+        let doc = nats.parse::<DocumentMut>().unwrap();
+        assert_eq!(doc["dependencies"]["async-nats"].as_str(), Some("0.50"));
+    }
+
     #[test]
     fn workspace_sources_are_shared_and_member_features_are_preserved() {
         let member = r#"

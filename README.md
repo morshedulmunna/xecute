@@ -132,7 +132,9 @@ xecute update
 xecute uninstall
 xecute run dev [--bin <name>] [--features <list>] [--watch <path>] [-- <app arguments>]
 xecute generate <resource|module|controller|service> <name>
+xecute generate worker <name> [--distributed] [--broker <postgres-outbox|rabbitmq|nats>]
 xecute g <res|mo|co|s> <name>
+xecute g wo <name> [--distributed] [--broker <postgres-outbox|rabbitmq|nats>]
 xecute --help
 xecute --version
 ```
@@ -154,11 +156,38 @@ xecute --version
 | `xecute g module billing` or `xecute g mo billing` | Registered module with an empty provider list |
 | `xecute g controller status` or `xecute g co status` | Standalone injectable controller with a GET endpoint |
 | `xecute g service mailer` or `xecute g s mailer` | Standalone injectable service |
+| `xecute g worker email` or `xecute g wo email` | Registered process-local job queue with payload, handler, and `jobs` feature |
+| `xecute g wo email --distributed` | Durable worker backed by the default PostgreSQL outbox |
+| `xecute g wo email --broker rabbitmq` | Durable RabbitMQ worker; `--broker` implies `--distributed` |
+| `xecute g wo email --distributed --broker nats` | NATS queue-group worker with at-most-once delivery |
 
 Run feature generators from the generated project root. Run `g apps` and
 `g library` from the workspace root. Standalone controllers and
 services require manual provider/route registration when you decide to use them.
 Standalone generators remain available in both architecture modes.
+
+Workers are registered automatically and enable the runtime's `jobs` feature.
+The default in-process queue provides 64 waiting slots and four workers with
+three attempts, a 250 ms retry delay, and a 30-second attempt timeout. Queues
+drain when the generated server shuts down. Jobs are process-local and are not
+persisted or shared across machines.
+
+Add `--distributed` to generate a durable producer and consumer. `--broker`
+accepts `postgres-outbox` (the default), `rabbitmq`, or `nats`, and implies
+`--distributed`:
+
+- `postgres-outbox` stores jobs in `xecute_<feature>_jobs`, claims them with
+  `FOR UPDATE SKIP LOCKED`, and reads `DATABASE_URL`.
+- `rabbitmq` consumes a durable `<feature>_jobs` queue and reads `RABBITMQ_URL`
+  (default `amqp://127.0.0.1:5672/%2f`). Failed deliveries are retried up to
+  three times.
+- `nats` uses a `<feature>-workers` queue group on `<feature>.jobs` and reads
+  `NATS_URL` (default `nats://127.0.0.1:4222`). Core NATS delivery is
+  at-most-once; handler failures are logged without redelivery.
+
+Distributed workers expose `<Feature>Queue::enqueue(...)` and `shutdown()`
+instead of `JobQueue`. Generate workers from an application using the current
+async container startup.
 
 Names must start with a lowercase ASCII letter and contain lowercase letters,
 digits, hyphens, or underscores. Rust keywords and empty name segments are
@@ -969,11 +998,12 @@ Licensed under **Apache-2.0**.
 
 ## Feature module folders
 
-All newly generated resources and standalone modules, controllers, and services
-live under `src/modules/<feature>/`. Each resource keeps its controller, DI module,
-DTOs, entities, repository, and HTTP tests together. CQRS resources also contain
-commands and queries. `src/modules/mod.rs` declares each feature;
-`AppModule` imports and mounts it through `crate::modules::<feature>`.
+All newly generated resources, standalone modules, controllers, services, and
+workers live under `src/modules/<feature>/`. Each resource keeps its controller,
+DI module, DTOs, entities, repository, and HTTP tests together. CQRS resources
+also contain commands and queries. Workers keep their payload, handler, queue
+provider, and optional broker transport together. `src/modules/mod.rs` declares
+each feature; `AppModule` imports and mounts it through `crate::modules::<feature>`.
 
 ```text
 src/
@@ -1287,11 +1317,11 @@ deadlocks. Custom definitions can mark a declared dependency optional with
 
 Concurrent resolutions initialize each singleton/request provider once. Factory
 errors are cached for that scope; recover external connectivity inside a shared
-client instead of expecting factory retries. `container.initialize()` eagerly
-constructs singletons and is called before generated applications listen.
-Factories are synchronous: initialize asynchronous SDK/database clients at
-startup and register their handles as values. A transient injected into a
-singleton is created when that singleton is built, then retained by it.
+client instead of expecting factory retries. `container.initialize_async()`
+eagerly constructs asynchronous and synchronous singletons before generated
+applications listen. Generated servers call `shutdown_async()` after the
+listener stops so queues drain and lifecycle hooks run. A transient injected into
+a singleton is created when that singleton is built, then retained by it.
 
 ## Testing modules and HTTP assertions
 
@@ -1318,8 +1348,8 @@ for definition in crate::app_module::AppModule::definitions() {
     module = module.module(definition);
 }
 // Example: module = module.override_value(DatabaseGateway(Arc::new(FakeDatabase)));
-let container = Arc::new(module.compile()?);
-let routes = crate::app_module::AppModule::router_with_container(container)?;
+let container = Arc::new(module.compile_async().await?);
+let routes = crate::app_module::AppModule::router_with_container(container.clone()).await?;
 let app = TestApp::new(crate::server::router(routes, &crate::configs::Config::default()));
 
 let response = app.post("/example")
@@ -1327,6 +1357,7 @@ let response = app.post("/example")
     .send().await?
     .assert_status(axum::http::StatusCode::CREATED);
 let body: serde_json::Value = response.json()?;
+container.shutdown_async().await?;
 ```
 
 Run these async helpers inside a Tokio runtime, such as `#[tokio::test]`.

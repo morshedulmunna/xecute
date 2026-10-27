@@ -5,7 +5,7 @@ use xecute::testing::TestApp;
 
 #[tokio::test]
 async fn creation_validates_before_persisting() {
-    let app = TestApp::new(crate::app_module::AppModule::router().unwrap());
+    let app = TestApp::new(crate::app_module::AppModule::router().await.unwrap());
     for (name, expected) in [
         ("ab", StatusCode::UNPROCESSABLE_ENTITY),
         ("   ", StatusCode::UNPROCESSABLE_ENTITY),

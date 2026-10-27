@@ -12,7 +12,7 @@ fn run() -> Result<(), String> {
     let mut args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() || matches!(args[0].as_str(), "--help" | "-h" | "help") {
         println!(
-            "Xecute — Rust modules, controllers and injectable services\n\n  xecute new <project|.> [--workspace] [--name <package-name>] [--mvc | --cqrs] [--runtime-path <cli/xecute>]\n  xecute update\n  xecute uninstall\n  xecute run dev [--bin <name>] [--features <list>] [--watch <path>] [-- <app arguments>]\n  xecute generate <resource|module|controller|service> <name>\n  xecute g <res|mo|co|s> <name>\n  xecute g apps <app_name> [--mvc | --cqrs] [--runtime-path <path>]\n  xecute g library <name> (alias: lib; run from workspace root)\n\nNew projects use MVC by default; --cqrs selects command/query handlers. Run generate from a project created with xecute new. Resources include a GET endpoint; individual generators create standalone building blocks."
+            "Xecute — Rust modules, controllers and injectable services\n\n  xecute new <project|.> [--workspace] [--name <package-name>] [--mvc | --cqrs] [--runtime-path <cli/xecute>]\n  xecute update\n  xecute uninstall\n  xecute run dev [--bin <name>] [--features <list>] [--watch <path>] [-- <app arguments>]\n  xecute generate <resource|module|controller|service> <name>\n  xecute generate worker <name> [--distributed] [--broker <postgres-outbox|rabbitmq|nats>]\n  xecute g <res|mo|co|s> <name>\n  xecute g wo <name> [--distributed] [--broker <postgres-outbox|rabbitmq|nats>]\n  xecute g apps <app_name> [--mvc | --cqrs] [--runtime-path <path>]\n  xecute g library <name> (alias: lib; run from workspace root)\n\nNew projects use MVC by default; --cqrs selects command/query handlers. Run generate from a project created with xecute new. Resources include a GET endpoint; individual generators create standalone building blocks or background workers. Workers are process-local by default; --broker selects a distributed transport and implies --distributed."
         );
         return Ok(());
     }
@@ -100,6 +100,42 @@ fn run() -> Result<(), String> {
         "generate" | "g" if args.first().is_some_and(|arg| matches!(arg.as_str(), "library" | "lib")) => {
             if args.len() != 2 { return Err("usage: xecute g library <name> (run from workspace root)".into()); }
             library::generate(&env::current_dir().map_err(|e| e.to_string())?, &args[1])
+        }
+        "generate" | "g"
+            if args
+                .first()
+                .is_some_and(|arg| matches!(arg.as_str(), "worker" | "wo")) =>
+        {
+            let usage = "usage: xecute g worker <name> [--distributed] [--broker <postgres-outbox|rabbitmq|nats>]";
+            let name = args.get(1).filter(|name| !name.starts_with('-')).ok_or(usage)?;
+            let mut distributed = false;
+            let mut broker = None;
+            let mut flags = args[2..].iter();
+            while let Some(flag) = flags.next() {
+                match flag.as_str() {
+                    "--distributed" if !distributed => distributed = true,
+                    "--broker" if broker.is_none() => {
+                        let value = flags
+                            .next()
+                            .filter(|value| !value.starts_with('-'))
+                            .ok_or("--broker requires postgres-outbox, rabbitmq, or nats")?;
+                        broker = Some(manifest::WorkerBroker::parse(value).ok_or(
+                            "--broker must be postgres-outbox, rabbitmq, or nats",
+                        )?);
+                    }
+                    _ => return Err(format!("unknown or duplicate option: {flag}")),
+                }
+            }
+            let broker = if distributed || broker.is_some() {
+                Some(broker.unwrap_or(manifest::WorkerBroker::PostgresOutbox))
+            } else {
+                None
+            };
+            generate::worker(
+                &env::current_dir().map_err(|e| e.to_string())?,
+                name,
+                broker,
+            )
         }
         "generate" | "g" if args.len() == 2 => generate::component(
             &env::current_dir().map_err(|e| e.to_string())?,

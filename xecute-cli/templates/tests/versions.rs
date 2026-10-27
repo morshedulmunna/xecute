@@ -4,8 +4,8 @@ use crate::{app_module::AppModule, configs::Config, server};
 use axum::{Router, body::to_bytes, http::StatusCode};
 use tower::ServiceExt;
 
-fn app(config: &Config) -> Router {
-    let base = AppModule::router().unwrap();
+async fn app(config: &Config) -> Router {
+    let base = AppModule::router().await.unwrap();
     let operations = AppModule::api_operations();
     let versions = server::versions::groups(config, base.clone(), operations.clone()).unwrap();
     server::router(versions.mount(base)
@@ -14,7 +14,7 @@ fn app(config: &Config) -> Router {
 }
 #[tokio::test]
 async fn versions_have_independent_routes_schemas_and_local_swagger_assets() {
-    let app = app(&Config::default());
+    let app = app(&Config::default()).await;
     for (path, status) in [
         ("/v1/example", StatusCode::OK), ("/v2/status", StatusCode::NOT_FOUND),
         ("/v2/example", StatusCode::NOT_FOUND), ("/v1/status", StatusCode::NOT_FOUND),
@@ -36,10 +36,10 @@ async fn versions_have_independent_routes_schemas_and_local_swagger_assets() {
 #[tokio::test]
 async fn docs_and_versioning_can_be_disabled_independently() {
     let config = Config { versioning_enabled: false, ..Config::default() };
-    let disabled = app(&config);
+    let disabled = app(&config).await;
     assert_eq!(disabled.oneshot(request("/v1/example", "127.0.0.1")).await.unwrap().status(), StatusCode::NOT_FOUND);
     let mut config = Config::default(); config.docs.enabled = false;
-    let disabled_docs = app(&config);
+    let disabled_docs = app(&config).await;
     assert_eq!(disabled_docs.clone().oneshot(request("/v1/example", "127.0.0.1")).await.unwrap().status(), StatusCode::OK);
     assert_eq!(disabled_docs.oneshot(request("/docs/v1/openapi.json", "127.0.0.1")).await.unwrap().status(), StatusCode::NOT_FOUND);
 }

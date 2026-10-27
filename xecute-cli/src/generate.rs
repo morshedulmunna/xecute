@@ -1,3 +1,4 @@
+use crate::manifest::WorkerBroker;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -148,6 +149,45 @@ pub(crate) fn format_files(root: &Path, paths: &[String]) -> Result<()> {
         })?;
     if !status.success() {
         return Err("files generated but formatting failed; run cargo fmt".into());
+    }
+    Ok(())
+}
+
+fn update_manifest<F>(
+    root: &Path,
+    inherit_dependencies: bool,
+    update: F,
+    message: &str,
+) -> Result<()>
+where
+    F: Fn(&str) -> std::result::Result<String, String>,
+{
+    let manifest_path = root.join("Cargo.toml");
+    if !manifest_path.exists() {
+        return Ok(());
+    }
+    let before = fs::read_to_string(&manifest_path).map_err(|e| e.to_string())?;
+    let manifest = update(&before)?;
+    let workspace_root = root
+        .ancestors()
+        .skip(1)
+        .filter(|_| inherit_dependencies)
+        .find(|parent| parent.join(".xecute/workspace").is_file());
+    let manifest = if let Some(workspace_root) = workspace_root {
+        let workspace_path = workspace_root.join("Cargo.toml");
+        let before_workspace = fs::read_to_string(&workspace_path).map_err(|e| e.to_string())?;
+        let (manifest, workspace) =
+            crate::manifest::workspace_dependencies(&manifest, &before_workspace, false)?;
+        if workspace != before_workspace {
+            write(&workspace_path, &workspace)?;
+        }
+        manifest
+    } else {
+        manifest
+    };
+    if before != manifest {
+        write(&manifest_path, &manifest)?;
+        println!("{message}");
     }
     Ok(())
 }
@@ -467,7 +507,7 @@ fn scaffold(
     )?;
     formatted.push("src/app_module.rs".into());
     format_files(&root, &formatted)?;
-    component_inner(&root, "resource", "example", !member)?;
+    component_inner(&root, "resource", "example", !member, None)?;
     if member {
         println!("Created {name} ({})", architecture.name());
         return Ok(());
@@ -714,16 +754,32 @@ fn centralize_dependencies(app: &Path, root: &Path, runtime_override: bool) -> R
 }
 
 pub fn component(root: &Path, kind: &str, name: &str) -> Result<()> {
-    component_inner(root, kind, name, true)
+    component_inner(root, kind, name, true, None)
 }
 
-fn component_inner(root: &Path, kind: &str, name: &str, inherit_dependencies: bool) -> Result<()> {
+/// Generate a worker, optionally backed by a distributed broker transport.
+pub(crate) fn worker(root: &Path, name: &str, broker: Option<WorkerBroker>) -> Result<()> {
+    component_inner(root, "worker", name, true, broker)
+}
+
+fn component_inner(
+    root: &Path,
+    kind: &str,
+    name: &str,
+    inherit_dependencies: bool,
+    broker: Option<WorkerBroker>,
+) -> Result<()> {
     let kind = match kind {
         "resource" | "res" => "resource",
         "module" | "mo" => "module",
         "controller" | "co" => "controller",
         "service" | "s" => "service",
-        _ => return Err("generator must be resource, module, controller, or service".into()),
+        "worker" | "wo" => "worker",
+        _ => {
+            return Err(
+                "generator must be resource, module, controller, service, or worker".into(),
+            );
+        }
     };
     let architecture = Architecture::read(root)?;
     let cqrs = kind == "resource" && architecture == Architecture::Cqrs;
@@ -739,6 +795,12 @@ fn component_inner(root: &Path, kind: &str, name: &str, inherit_dependencies: bo
     let mut main =
         fs::read_to_string(&main_path).map_err(|_| "run generate from a Xecute project root")?;
     let mut app = fs::read_to_string(&app_path).map_err(|_| "missing src/app_module.rs")?;
+    if kind == "worker" && !app.contains("initialize_async") {
+        return Err(
+            "worker generation requires async container initialization; regenerate the app with this CLI or update src/app_module.rs to call initialize_async"
+                .into(),
+        );
+    }
     let modules = root.join("src/modules");
     if let Ok(metadata) = modules.symlink_metadata()
         && (!metadata.is_dir() || metadata.file_type().is_symlink())
@@ -814,8 +876,52 @@ fn component_inner(root: &Path, kind: &str, name: &str, inherit_dependencies: bo
             "mod controller;\npub use controller::{pascal}Controller;\n"
         ));
     }
-    if matches!(kind, "resource" | "module") {
-        let module = if cqrs {
+    let worker_broker = if kind == "worker" { broker } else { None };
+    if kind == "worker" {
+        let job = if worker_broker.is_some() {
+            include_str!("../templates/worker/distributed/job.rs")
+        } else {
+            include_str!("../templates/worker/job.rs")
+        };
+        files.push((
+            "job.rs".into(),
+            job.replace("__TYPE__", &pascal)
+                .replace("__FEATURE__", &snake),
+        ));
+        if let Some(broker) = worker_broker {
+            let broker_template = match broker {
+                WorkerBroker::PostgresOutbox => {
+                    include_str!("../templates/worker/distributed/postgres.rs")
+                }
+                WorkerBroker::RabbitMq => {
+                    include_str!("../templates/worker/distributed/rabbitmq.rs")
+                }
+                WorkerBroker::Nats => include_str!("../templates/worker/distributed/nats.rs"),
+            };
+            files.push((
+                "broker.rs".into(),
+                broker_template
+                    .replace("__TYPE__", &pascal)
+                    .replace("__FEATURE__", &snake),
+            ));
+            mods.push_str(&format!(
+                "mod job;\npub use job::{pascal}Job;\n\nmod broker;\npub use broker::{{{pascal}Queue, {pascal}QueueError}};\n\n"
+            ));
+        } else {
+            mods.push_str(&format!("mod job;\npub use job::{pascal}Job;\n\n"));
+        }
+    }
+    if matches!(kind, "resource" | "module" | "worker") {
+        let module = if kind == "worker" {
+            let template = if worker_broker.is_some() {
+                include_str!("../templates/worker/distributed/module.rs")
+            } else {
+                include_str!("../templates/worker/module.rs")
+            };
+            template
+                .replace("__TYPE__", &pascal)
+                .replace("__FEATURE__", &snake)
+        } else if cqrs {
             include_str!("../templates/cqrs/module.rs").replace("__TYPE__", &pascal)
         } else if kind == "resource" {
             include_str!("../templates/resource/module.rs").replace("__TYPE__", &pascal)
@@ -915,33 +1021,20 @@ fn component_inner(root: &Path, kind: &str, name: &str, inherit_dependencies: bo
         }
     }
     if kind == "resource" {
-        let manifest_path = root.join("Cargo.toml");
-        if manifest_path.exists() {
-            let before = fs::read_to_string(&manifest_path).map_err(|e| e.to_string())?;
-            let manifest = crate::manifest::resource_dependencies(&before)?;
-            let workspace_root = root
-                .ancestors()
-                .skip(1)
-                .filter(|_| inherit_dependencies)
-                .find(|parent| parent.join(".xecute/workspace").is_file());
-            let manifest = if let Some(workspace_root) = workspace_root {
-                let workspace_path = workspace_root.join("Cargo.toml");
-                let before_workspace =
-                    fs::read_to_string(&workspace_path).map_err(|e| e.to_string())?;
-                let (manifest, workspace) =
-                    crate::manifest::workspace_dependencies(&manifest, &before_workspace, false)?;
-                if workspace != before_workspace {
-                    write(&workspace_path, &workspace)?;
-                }
-                manifest
-            } else {
-                manifest
-            };
-            if before != manifest {
-                write(&manifest_path, &manifest)?;
-                println!("Updated resource dependencies; cargo build will refresh Cargo.lock.");
-            }
-        }
+        update_manifest(
+            root,
+            inherit_dependencies,
+            crate::manifest::resource_dependencies,
+            "Updated resource dependencies; cargo build will refresh Cargo.lock.",
+        )?;
+    }
+    if kind == "worker" {
+        update_manifest(
+            root,
+            inherit_dependencies,
+            |manifest| crate::manifest::worker_dependencies(manifest, broker),
+            "Updated worker dependencies; cargo build will refresh Cargo.lock.",
+        )?;
     }
     fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
     let mut formatted = vec![
@@ -962,6 +1055,29 @@ fn component_inner(root: &Path, kind: &str, name: &str, inherit_dependencies: bo
     println!("Created {kind} {pascal} in src/modules/{snake}");
     if matches!(kind, "service" | "controller") {
         println!("Add this building block to a module's providers when ready to use it.");
+    }
+    if kind == "worker" {
+        if let Some(broker) = worker_broker {
+            match broker {
+                WorkerBroker::PostgresOutbox => println!(
+                    "Distributed worker uses {} storage; set DATABASE_URL before startup.",
+                    broker.name()
+                ),
+                WorkerBroker::RabbitMq => println!(
+                    "Distributed worker uses {}; set RABBITMQ_URL to override amqp://127.0.0.1:5672/%2f.",
+                    broker.name()
+                ),
+                WorkerBroker::Nats => println!(
+                    "Distributed worker uses {} (at-most-once); set NATS_URL to override nats://127.0.0.1:4222.",
+                    broker.name()
+                ),
+            }
+            println!("Inject Arc<{pascal}Queue> from a module that imports {pascal}Module.");
+        } else {
+            println!(
+                "Inject Arc<JobQueue<{pascal}Job>> from a module that imports {pascal}Module."
+            );
+        }
     }
     Ok(())
 }
@@ -995,6 +1111,115 @@ mod tests {
         assert!(component(&root, "res", "user").is_err());
         assert_eq!(
             before,
+            fs::read_to_string(root.join("src/app_module.rs")).unwrap()
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn standalone_module_uses_the_generated_macro_import() {
+        let root =
+            std::env::temp_dir().join(format!("xecute-cli-module-test-{}", std::process::id()));
+        fs::create_dir_all(root.join("src")).unwrap();
+        write(&root.join("src/main.rs"), "mod app_module;\n").unwrap();
+        write(
+            &root.join("src/app_module.rs"),
+            include_str!("../templates/app_module.rs"),
+        )
+        .unwrap();
+        component(&root, "module", "billing").unwrap();
+        let module = fs::read_to_string(root.join("src/modules/billing/module.rs")).unwrap();
+        assert!(module.contains("use xecute::module;"));
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn distributed_worker_generates_selected_broker_transport() {
+        for (broker, marker, dependency) in [
+            (WorkerBroker::PostgresOutbox, "xecute_email_jobs", None),
+            (WorkerBroker::RabbitMq, "basic_publish", Some("lapin")),
+            (WorkerBroker::Nats, "queue_subscribe", Some("async-nats")),
+        ] {
+            let root = std::env::temp_dir().join(format!(
+                "xecute-cli-distributed-{}-{}",
+                broker.name(),
+                std::process::id()
+            ));
+            fs::create_dir_all(root.join("src")).unwrap();
+            write(&root.join("src/main.rs"), "mod app_module;\n").unwrap();
+            write(
+                &root.join("src/app_module.rs"),
+                include_str!("../templates/app_module.rs"),
+            )
+            .unwrap();
+            write(
+                &root.join("Cargo.toml"),
+                "[package]\nname = \"example\"\nversion = \"0.0.0\"\nedition = \"2024\"\n\n[dependencies]\nxecute = \"0.1.10\"\n",
+            )
+            .unwrap();
+            worker(&root, "email", Some(broker)).unwrap();
+            let app = fs::read_to_string(root.join("src/app_module.rs")).unwrap();
+            assert!(app.contains("EmailModule::definition()"));
+            assert!(!app.contains("EmailModule::scoped_router"));
+            let job = fs::read_to_string(root.join("src/modules/email/job.rs")).unwrap();
+            assert!(job.contains("Serialize"));
+            assert!(job.contains("Deserialize"));
+            let broker_file = fs::read_to_string(root.join("src/modules/email/broker.rs")).unwrap();
+            assert!(broker_file.contains(marker));
+            let module = fs::read_to_string(root.join("src/modules/email/module.rs")).unwrap();
+            assert!(module.contains("ProviderDefinition::singleton_async"));
+            assert!(module.contains(".export::<EmailQueue>()"));
+            let module_index = fs::read_to_string(root.join("src/modules/email/mod.rs")).unwrap();
+            assert!(module_index.contains("pub use broker::{EmailQueue, EmailQueueError};"));
+            let manifest = fs::read_to_string(root.join("Cargo.toml")).unwrap();
+            assert!(manifest.contains("\"jobs\""));
+            if broker == WorkerBroker::PostgresOutbox {
+                assert!(manifest.contains("\"postgres\""));
+            }
+            if let Some(dependency) = dependency {
+                assert!(manifest.contains(dependency));
+            }
+            assert!(worker(&root, "email", Some(broker)).is_err());
+            fs::remove_dir_all(root).unwrap();
+        }
+    }
+
+    #[test]
+    fn worker_registers_queue_and_duplicate_preserves_files() {
+        let root =
+            std::env::temp_dir().join(format!("xecute-cli-worker-test-{}", std::process::id()));
+        fs::create_dir_all(root.join("src")).unwrap();
+        write(&root.join("src/main.rs"), "mod app_module;\n").unwrap();
+        write(
+            &root.join("src/app_module.rs"),
+            include_str!("../templates/app_module.rs"),
+        )
+        .unwrap();
+        write(
+            &root.join("Cargo.toml"),
+            "[package]\nname = \"example\"\nversion = \"0.0.0\"\nedition = \"2024\"\n\n[dependencies]\nxecute = \"0.1.10\"\n",
+        )
+        .unwrap();
+        component(&root, "worker", "email").unwrap();
+        let app = fs::read_to_string(root.join("src/app_module.rs")).unwrap();
+        assert!(app.contains("use crate::modules::email::EmailModule;"));
+        assert!(app.contains("EmailModule,"));
+        assert!(app.contains("EmailModule::definition()"));
+        assert!(!app.contains("EmailModule::scoped_router"));
+        assert!(
+            fs::read_to_string(root.join("src/modules/mod.rs"))
+                .unwrap()
+                .contains("pub mod email;")
+        );
+        let job = fs::read_to_string(root.join("src/modules/email/job.rs")).unwrap();
+        assert!(job.contains("pub struct EmailJob"));
+        assert!(job.contains("pub(crate) async fn handle"));
+        let module = fs::read_to_string(root.join("src/modules/email/module.rs")).unwrap();
+        assert!(module.contains("JobQueue::provider"));
+        assert!(module.contains(".export::<JobQueue<EmailJob>>()"));
+        let manifest = fs::read_to_string(root.join("Cargo.toml")).unwrap();
+        assert!(manifest.contains("\"jobs\""));
+        assert!(component(&root, "worker", "email").is_err());
+        assert_eq!(
+            app,
             fs::read_to_string(root.join("src/app_module.rs")).unwrap()
         );
         fs::remove_dir_all(root).unwrap();

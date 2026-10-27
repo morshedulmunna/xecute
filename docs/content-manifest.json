@@ -452,9 +452,9 @@
     {
       "route": "integrations/jobs",
       "title": "Jobs and scheduling",
-      "description": "Run bounded process-local workers with retries, receipts and interval schedules.",
+      "description": "Choose process-local jobs or broker-backed workers, with retries and interval schedules.",
       "source": "xecute/docs/jobs.md",
-      "intro": "Move suitable work out of a request handler into bounded workers. These jobs run in the current process and are not durable across restart; choose that model before configuring retries.",
+      "intro": "Move suitable work out of a request handler into bounded workers. Process-local jobs are not durable across restart; generate a PostgreSQL outbox, RabbitMQ, or NATS worker when work must survive restarts or span processes.",
       "next": {
         "route": "integrations/cache",
         "title": "Memory and Redis caching"

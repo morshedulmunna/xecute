@@ -63,11 +63,11 @@ deadlocks. Custom definitions can mark a declared dependency optional with
 
 Concurrent resolutions initialize each singleton/request provider once. Factory
 errors are cached for that scope; recover external connectivity inside a shared
-client instead of expecting factory retries. `container.initialize()` eagerly
-constructs singletons and is called before generated applications listen.
-Factories are synchronous: initialize asynchronous SDK/database clients at
-startup and register their handles as values. A transient injected into a
-singleton is created when that singleton is built, then retained by it.
+client instead of expecting factory retries. `container.initialize_async()`
+eagerly constructs asynchronous and synchronous singletons before generated
+applications listen. Generated servers call `shutdown_async()` after the
+listener stops so queues drain and lifecycle hooks run. A transient injected into
+a singleton is created when that singleton is built, then retained by it.
 
 ## Keep learning
 

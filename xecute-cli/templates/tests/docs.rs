@@ -11,6 +11,7 @@ async fn default_swagger_documents_the_example_and_serves_local_assets() {
     let config = Config::default();
     let app = server::router(
         AppModule::router()
+            .await
             .unwrap()
             .merge(server::docs::router(&config, AppModule::api_operations()).unwrap()),
         &config,

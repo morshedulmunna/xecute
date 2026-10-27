@@ -43,11 +43,88 @@ Commands:
   controller with a GET endpoint; register it in your module manually.
 - `generate service <name>` / `g s <name>`: create a standalone injectable
   service; register it in your module manually.
+- `generate worker <name>` / `g wo <name> [--distributed] [--broker <postgres-outbox|rabbitmq|nats>]`:
+  create and register a background job queue with a payload, handler, and
+  lifecycle-managed provider. The default is process-local; distributed mode
+  adds a durable broker transport.
 
 Names such as `user-profile` become `src/modules/user_profile/` and `UserProfileModule`.
 No `#[path]` annotations are generated. Existing component folders are never
 overwritten. Run generation from the project root. Automatic registration uses
 the comments in `app_module.rs`; keep these markers when editing that file.
+
+### Background workers
+
+`xecute g worker email` creates `src/modules/email/{job.rs,module.rs,mod.rs}`,
+registers the module, and enables the runtime's `jobs` feature in `Cargo.toml`.
+The generated handler and queue are process-local:
+
+```rust
+use crate::modules::email::{EmailJob, EmailModule};
+use std::sync::Arc;
+use xecute::jobs::JobQueue;
+
+#[injectable]
+pub struct Mailer {
+    queue: Arc<JobQueue<EmailJob>>,
+}
+
+impl Mailer {
+    pub async fn send(&self, record_id: u64) -> Result<(), xecute::jobs::QueueError> {
+        self.queue.enqueue(EmailJob { record_id }).await?;
+        Ok(())
+    }
+}
+```
+
+Add `EmailModule` to another feature module's `imports` before injecting its
+queue. Generated defaults are 64 waiting jobs, four workers, three attempts, a
+250 ms retry delay, and a 30-second attempt timeout; edit `module.rs` to tune
+them. Queues drain during generated-server shutdown. Jobs are not persisted and
+are not shared across processes or machines.
+
+For durable, multi-process workers, add `--distributed`. `--broker` accepts
+`postgres-outbox` (the default), `rabbitmq`, or `nats`, and implies
+`--distributed`:
+
+```sh
+xecute g worker email --distributed                 # PostgreSQL outbox
+xecute g worker email --broker rabbitmq             # RabbitMQ
+xecute g worker email --distributed --broker nats   # NATS
+```
+
+Distributed generation adds `src/modules/email/broker.rs` and exports
+`EmailQueue` and `EmailQueueError`. The module registers the queue with
+`singleton_async` and shuts it down during application lifecycle cleanup:
+
+```rust
+use crate::modules::email::{EmailJob, EmailModule, EmailQueue, EmailQueueError};
+use std::sync::Arc;
+
+#[injectable]
+pub struct Mailer {
+    queue: Arc<EmailQueue>,
+}
+
+impl Mailer {
+    pub async fn send(&self, record_id: u64) -> Result<(), EmailQueueError> {
+        self.queue.enqueue(EmailJob { record_id }).await
+    }
+}
+```
+
+Add `EmailModule` to another feature module's `imports` before injecting its
+queue. Broker behavior:
+
+| Broker | Default configuration | Delivery and retries |
+| --- | --- | --- |
+| `postgres-outbox` | `DATABASE_URL`; table `xecute_email_jobs` | `FOR UPDATE SKIP LOCKED`, three attempts, 250 ms retry delay, 30 s attempt timeout |
+| `rabbitmq` | `RABBITMQ_URL` default `amqp://127.0.0.1:5672/%2f`; durable `email_jobs` queue | Failed deliveries republish up to three attempts |
+| `nats` | `NATS_URL` default `nats://127.0.0.1:4222`; subject `email.jobs`, queue group `email-workers` | Core NATS at-most-once; failures are logged without redelivery |
+
+Each distributed consumer opens its own connection or pool, so run additional
+processes or replicas to scale. Worker generation requires the async container
+startup used by current generated applications.
 
 Generated projects use `xecute = { version = "0.1.10" }` from crates.io by default.
 Use `xecute new my-api --runtime-path /path/to/xecute/xecute` for local development.
@@ -145,11 +222,12 @@ retrying. A named destination also accepts `--name` to choose its package name.
 
 ## Feature module folders
 
-All newly generated resources and standalone modules, controllers, and services
-live under `src/modules/<feature>/`. Each resource keeps its controller, DI module,
-DTOs, entities, repository, and HTTP tests together. CQRS resources also contain
-commands and queries. `src/modules/mod.rs` declares each feature;
-`AppModule` imports and mounts it through `crate::modules::<feature>`.
+All newly generated resources, standalone modules, controllers, services, and
+workers live under `src/modules/<feature>/`. Each resource keeps its controller,
+DI module, DTOs, entities, repository, and HTTP tests together. CQRS resources
+also contain commands and queries. Workers keep their payload, handler, and queue
+provider together. `src/modules/mod.rs` declares each feature; `AppModule`
+imports and mounts it through `crate::modules::<feature>`.
 
 ```text
 src/
@@ -487,11 +565,11 @@ deadlocks. Custom definitions can mark a declared dependency optional with
 
 Concurrent resolutions initialize each singleton/request provider once. Factory
 errors are cached for that scope; recover external connectivity inside a shared
-client instead of expecting factory retries. `container.initialize()` eagerly
-constructs singletons and is called before generated applications listen.
-Factories are synchronous: initialize asynchronous SDK/database clients at
-startup and register their handles as values. A transient injected into a
-singleton is created when that singleton is built, then retained by it.
+client instead of expecting factory retries. `container.initialize_async()`
+eagerly constructs asynchronous and synchronous singletons before generated
+applications listen. Generated servers call `shutdown_async()` after the
+listener stops so queues drain and lifecycle hooks run. A transient injected into
+a singleton is created when that singleton is built, then retained by it.
 
 ## Testing modules and HTTP assertions
 
@@ -518,8 +596,8 @@ for definition in crate::app_module::AppModule::definitions() {
     module = module.module(definition);
 }
 // Example: module = module.override_value(DatabaseGateway(Arc::new(FakeDatabase)));
-let container = Arc::new(module.compile()?);
-let routes = crate::app_module::AppModule::router_with_container(container)?;
+let container = Arc::new(module.compile_async().await?);
+let routes = crate::app_module::AppModule::router_with_container(container.clone()).await?;
 let app = TestApp::new(crate::server::router(routes, &crate::configs::Config::default()));
 
 let response = app.post("/example")
@@ -527,6 +605,7 @@ let response = app.post("/example")
     .send().await?
     .assert_status(axum::http::StatusCode::CREATED);
 let body: serde_json::Value = response.json()?;
+container.shutdown_async().await?;
 ```
 
 Run these async helpers inside a Tokio runtime, such as `#[tokio::test]`.

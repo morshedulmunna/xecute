@@ -23,8 +23,8 @@ for definition in crate::app_module::AppModule::definitions() {
     module = module.module(definition);
 }
 // Example: module = module.override_value(DatabaseGateway(Arc::new(FakeDatabase)));
-let container = Arc::new(module.compile()?);
-let routes = crate::app_module::AppModule::router_with_container(container)?;
+let container = Arc::new(module.compile_async().await?);
+let routes = crate::app_module::AppModule::router_with_container(container.clone()).await?;
 let app = TestApp::new(crate::server::router(routes, &crate::configs::Config::default()));
 
 let response = app.post("/example")
@@ -32,6 +32,7 @@ let response = app.post("/example")
     .send().await?
     .assert_status(axum::http::StatusCode::CREATED);
 let body: serde_json::Value = response.json()?;
+container.shutdown_async().await?;
 ```
 
 Run these async helpers inside a Tokio runtime, such as `#[tokio::test]`.

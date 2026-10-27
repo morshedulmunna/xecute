@@ -1,4 +1,4 @@
-Move suitable work out of a request handler into bounded workers. These jobs run in the current process and are not durable across restart; choose that model before configuring retries.
+Move suitable work out of a request handler into bounded workers. Process-local jobs are not durable across restart; generate a PostgreSQL outbox, RabbitMQ, or NATS worker when work must survive restarts or span processes.
 
 Enable Xecute's `jobs` feature for bounded, process-local Tokio workers with
 receipts, retries, per-attempt deadlines, graceful draining, and interval schedules.
@@ -13,6 +13,36 @@ queued and running work. Use a durable broker or a database outbox/worker system
 for work that must survive a crash. This implementation is suitable for bounded
 best-effort application work; it does not claim exactly-once delivery, distributed
 leases, dead-letter storage, or multi-process queue coordination.
+
+## Distributed workers
+
+For work shared across processes, generate a distributed worker instead of a
+process-local queue:
+
+```sh
+xecute g worker email --distributed                 # PostgreSQL outbox
+xecute g worker email --broker rabbitmq             # RabbitMQ
+xecute g worker email --distributed --broker nats   # NATS
+```
+
+`--broker` implies `--distributed`. Distributed generation adds `broker.rs` and
+exports `<Feature>Queue` and `<Feature>QueueError`; inject `Arc<EmailQueue>` into
+modules that import `EmailModule` and call `enqueue(EmailJob { .. }).await`.
+Shutdown hooks close each consumer during application cleanup.
+
+- PostgreSQL outbox stores jobs in `xecute_<feature>_jobs`, reads `DATABASE_URL`,
+  claims with `FOR UPDATE SKIP LOCKED`, and retries up to three attempts with a
+  250 ms delay and a 30-second attempt timeout.
+- RabbitMQ consumes a durable `<feature>_jobs` queue, reads `RABBITMQ_URL`
+  (default `amqp://127.0.0.1:5672/%2f`), and republishes failures up to three
+  attempts.
+- NATS uses subject `<feature>.jobs` and queue group `<feature>-workers`, reads
+  `NATS_URL` (default `nats://127.0.0.1:4222`), and provides at-most-once
+  delivery; handler failures are logged without redelivery.
+
+Run additional processes or replicas to scale consumers. The remainder of this
+page documents the in-process `JobQueue` API; see the
+[CLI reference](../cli/commands.md) for distributed scaffolding details.
 
 ## Create a queue and observe completion
 

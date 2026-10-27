@@ -15,8 +15,8 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _logging = logging::init(&config)?;
 
     // Resolve application dependencies and apply the shared HTTP policies.
-    let container = Arc::new(app_module::AppModule::container()?);
-    let app = app_module::AppModule::router_with_container(container)?;
+    let container = Arc::new(app_module::AppModule::container().await?);
+    let app = app_module::AppModule::router_with_container(container.clone()).await?;
     let operations = app_module::AppModule::api_operations();
     let versions = super::versions::groups(&config, app.clone(), operations.clone())?;
     let app = versions.mount(app)
@@ -52,21 +52,25 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Keep one serving future alive while awaiting either completion or shutdown.
     tokio::pin!(server);
 
-    tokio::select! {
-        result = &mut server => result?,
+    let result: Result<(), Box<dyn std::error::Error + Send + Sync>> = tokio::select! {
+        result = &mut server => result.map_err(Into::into),
         _ = draining.notified() => {
             // Allow in-flight requests to finish, but never wait beyond the grace period.
             match tokio::time::timeout(config.shutdown_grace, &mut server).await {
-                Ok(result) => result?,
+                Ok(result) => result.map_err(Into::into),
                 Err(error) => {
                     tracing::error!("shutdown drain deadline exceeded");
-                    return Err(error.into());
+                    Err(error.into())
                 }
             }
         }
-    }
+    };
 
+    // Drain queues and run lifecycle cleanup before the process exits.
+    let cleanup = container.shutdown_async().await;
     tracing::info!("server stopped");
+    result?;
+    cleanup?;
 
     Ok(())
 }

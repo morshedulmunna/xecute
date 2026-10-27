@@ -29,20 +29,20 @@ impl AppModule {
     }
 
     /// Validate and eagerly construct singleton providers before listening.
-    pub fn container() -> Result<Container, InjectError> {
+    pub async fn container() -> Result<Container, InjectError> {
         let container = ModuleGraph::new(Self::definitions()).build()?;
-        container.initialize()?;
+        container.initialize_async().await?;
         Ok(container)
     }
 
     /// Resolve controllers using the configured provider lifecycles.
-    pub fn router() -> Result<Router, InjectError> {
-        Self::router_with_container(Arc::new(Self::container()?))
+    pub async fn router() -> Result<Router, InjectError> {
+        Self::router_with_container(Arc::new(Self::container().await?)).await
     }
 
     /// Assemble the real HTTP routes with an application or isolated testing container.
-    pub fn router_with_container(container: Arc<Container>) -> Result<Router, InjectError> {
-        container.initialize()?;
+    pub async fn router_with_container(container: Arc<Container>) -> Result<Router, InjectError> {
+        container.initialize_async().await?;
         let _ = &container;
         let router = Router::new();
         // xecute:routes

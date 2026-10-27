@@ -42,7 +42,7 @@
 - [Welcome and startup URLs](skills/xecute/references/configuration/welcome.md): Discover enabled documentation, static assets and route version groups.
 - [PostgreSQL](skills/xecute/references/integrations/postgres.md): Configure lifecycle-managed pools, migrations, repositories and transactions.
 - [Guards and JWT authentication](skills/xecute/references/integrations/auth.md): Protect routes with verified users and role/permission policies.
-- [Jobs and scheduling](skills/xecute/references/integrations/jobs.md): Run bounded process-local workers with retries, receipts and interval schedules.
+- [Jobs and scheduling](skills/xecute/references/integrations/jobs.md): Choose process-local jobs or broker-backed workers, with retries and interval schedules.
 - [Memory and Redis caching](skills/xecute/references/integrations/cache.md): Use explicit TTL caching with bounded memory or namespaced Redis.
 - [CQRS buses and events](skills/xecute/references/integrations/cqrs.md): Register typed command/query handlers, event subscribers and shared pipelines.
 - [Quality checks](skills/xecute/references/testing/checks.md): Run runtime, generator and generated-application checks.

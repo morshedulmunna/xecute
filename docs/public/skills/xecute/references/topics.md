@@ -51,7 +51,7 @@ Read by task, or use [the complete manual](full.md).
 
 - [PostgreSQL](integrations/postgres.md): Configure lifecycle-managed pools, migrations, repositories and transactions.
 - [Guards and JWT authentication](integrations/auth.md): Protect routes with verified users and role/permission policies.
-- [Jobs and scheduling](integrations/jobs.md): Run bounded process-local workers with retries, receipts and interval schedules.
+- [Jobs and scheduling](integrations/jobs.md): Choose process-local jobs or broker-backed workers, with retries and interval schedules.
 - [Memory and Redis caching](integrations/cache.md): Use explicit TTL caching with bounded memory or namespaced Redis.
 - [CQRS buses and events](integrations/cqrs.md): Register typed command/query handlers, event subscribers and shared pipelines.
 

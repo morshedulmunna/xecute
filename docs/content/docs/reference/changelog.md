@@ -20,6 +20,21 @@ created projects and resources.
 - Preflight collisions/exclusions/symlinks, stage formatted files, serialize library
   generation, and report recoverable lockfile errors. Add consumer-app tests and
   a complete library guide included in the website and AI-agent skill bundle.
+- `xecute g worker <name>` / `g wo <name>` creates and registers an in-process
+  background job queue with a payload, handler, graceful drain, and `jobs`
+  feature enabled automatically.
+- Distributed worker generation via `--distributed [--broker <postgres-outbox|rabbitmq|nats>]`.
+  PostgreSQL outbox is the default; RabbitMQ and NATS add broker clients and
+  export `<Feature>Queue` for cross-process enqueueing. `--broker` implies
+  `--distributed`.
+
+### Changed
+
+- Generated applications initialize containers asynchronously and run lifecycle
+  cleanup after the listener stops, allowing async providers such as job queues to
+  drain before exit. Tests use the async testing container and application entry
+  points. Existing generated applications keep their current synchronous startup;
+  worker generation requires the async entry points.
 
 ## [0.1.20] - 2026-10-27
 
