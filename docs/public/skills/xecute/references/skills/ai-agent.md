@@ -4,7 +4,7 @@ integrations, and verification workflow.
 
 ## Download the complete skill
 
-[Download the Xecute skill bundle](https://github.com/morshedulmunna/xecute/blob/main/../../../../../skills/xecute.zip)
+[Download the Xecute skill bundle](/skills/xecute.zip)
 
 The ZIP contains one `xecute/` folder:
 
@@ -56,10 +56,10 @@ when implementing the next task. Check the installed APIs before making changes.
 
 | Resource | Best for |
 | --- | --- |
-| [SKILL.md](https://github.com/morshedulmunna/xecute/blob/main/../../../../../skills/xecute/SKILL.md) | Inspect the agent instructions |
-| [Topic index](https://github.com/morshedulmunna/xecute/blob/main/../../../../../llms.txt) | Discover every machine-readable page |
-| [Full documentation](https://github.com/morshedulmunna/xecute/blob/main/../../../../../llms-full.txt) | Read all documentation in one request |
-| [Bundled reference index](https://github.com/morshedulmunna/xecute/blob/main/../../../../../skills/xecute/references/topics.md) | Browse the skill's included files |
+| [SKILL.md](/skills/xecute/SKILL.md) | Inspect the agent instructions |
+| [Topic index](/llms.txt) | Discover every machine-readable page |
+| [Full documentation](/llms-full.txt) | Read all documentation in one request |
+| [Bundled reference index](/skills/xecute/references/topics.md) | Browse the skill's included files |
 
 These URLs return plain text or Markdown and do not require JavaScript. Resolve
 them relative to the documentation site's base path when hosted in a subdirectory.

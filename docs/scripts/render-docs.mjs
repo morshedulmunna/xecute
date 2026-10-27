@@ -1,4 +1,5 @@
 // Render compiled articles, landing navigation, search and anchors without a browser.
+import { existsSync } from 'node:fs';
 import { createServer } from 'vite';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -25,6 +26,12 @@ try {
     if (!page || (hash && !page.anchors.has(decodeURIComponent(hash)))) throw new Error(`Broken rendered link in ${origin}: ${href}`);
   }
   for (const [url, page] of [...pages.entries(), ['/', { html: home }]]) for (const match of page.html.matchAll(/\bhref="([^"]+)"/g)) checkLink(match[1], url);
+  const skillPage = pages.get('/docs/skills/ai-agent')?.html ?? '';
+  if (!/<a\b[^>]*download="xecute.zip"[^>]*>/.test(skillPage)) throw new Error('Skill bundle must render as a native download link.');
+  if (!skillPage.includes(`href="${server.config.base}skills/xecute.zip"`)) throw new Error('Skill bundle must link to the site asset, not GitHub.');
+  for (const match of skillPage.matchAll(/\bhref="(\/(?:skills\/[^"#]+|llms(?:-full)?\.txt))"/g)) {
+    if (!existsSync(resolve(root, 'public', match[1].slice(1)))) throw new Error(`Missing downloadable skill resource: ${match[1]}`);
+  }
   const linked = new Set();
   function navigation(nodes) { for (const node of nodes) { if (node.url) { checkLink(node.url, 'sidebar'); linked.add(node.url); } if (node.index) { checkLink(node.index.url, 'sidebar'); linked.add(node.index.url); } if (node.children) navigation(node.children); } }
   navigation(source.pageTree.children);

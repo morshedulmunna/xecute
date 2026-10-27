@@ -48,7 +48,7 @@ function section(page) {
   return text.split('\n').slice(start.line + 1, end?.line).join('\n').replace(/^(#{3,6}) /gm, (_, prefix) => `${'#'.repeat(Math.max(2, prefix.length - 1))} `);
 }
 function target(link, source) {
-  if (/^(?:https?:|mailto:|tel:|\/docs(?:\/|$))/.test(link)) return link;
+  if (/^(?:https?:|mailto:|tel:|\/docs(?:\/|$)|\/skills\/|\/llms(?:-full)?\.txt$)/.test(link)) return link;
   if (link.startsWith('#')) { const mapped = anchors.get(source)?.get(link.slice(1)); return mapped ? `${url(mapped.route)}${mapped.top ? '' : link}` : link; }
   const [file, anchor] = link.split('#');
   const absolute = resolve(dirname(resolve(repo, source)), file);
