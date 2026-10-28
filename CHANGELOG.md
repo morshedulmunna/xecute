@@ -7,6 +7,10 @@ created projects and resources.
 
 ## [Unreleased]
 
+## [0.1.21] - 2026-10-28
+
+Packages: `xecute-cli 0.1.21`, unchanged `xecute 0.1.10` and `xmacros 0.1.8`.
+
 ### Added
 
 - `xecute g library <name>` / `g lib <name>` creates a private, tested Cargo library

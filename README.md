@@ -51,7 +51,7 @@ for adopting the new capabilities in an existing application. Run it locally wit
 
 ## Release status
 
-Published packages are `xecute-cli 0.1.20`, `xecute 0.1.10`, and `xmacros 0.1.8`.
+Published packages are `xecute-cli 0.1.21`, `xecute 0.1.10`, and `xmacros 0.1.8`.
 MVC is the default; CQRS is selected with `--cqrs`.
 
 This release includes `xecute run dev` with automatic development rebuild/restart,
@@ -71,9 +71,9 @@ Use a Rust installation with Cargo, rustfmt, and Clippy.
 Install the published CLI:
 
 ```sh
-cargo install xecute-cli --version 0.1.20 --locked
+cargo install xecute-cli --version 0.1.21 --locked
 # Update an existing installation:
-cargo install xecute-cli --version 0.1.20 --locked --force
+cargo install xecute-cli --version 0.1.21 --locked --force
 ```
 
 Create and run an MVC application:

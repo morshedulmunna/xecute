@@ -12,6 +12,10 @@ created projects and resources.
 
 ## [Unreleased]
 
+## [0.1.21] - 2026-10-28
+
+Packages: `xecute-cli 0.1.21`, unchanged `xecute 0.1.10` and `xmacros 0.1.8`.
+
 ### Added
 
 - `xecute g library <name>` / `g lib <name>` creates a private, tested Cargo library
@@ -30,6 +34,9 @@ created projects and resources.
 
 ### Changed
 
+- Generated MVC/CQRS controller templates now document authentication through a
+  route guard plus a custom `FromRequestParts` extractor, equivalent to NestJS
+  `@UseGuards` plus `@CurrentUser()`, instead of implying raw header parsing.
 - Generated applications initialize containers asynchronously and run lifecycle
   cleanup after the listener stops, allowing async providers such as job queues to
   drain before exit. Tests use the async testing container and application entry
